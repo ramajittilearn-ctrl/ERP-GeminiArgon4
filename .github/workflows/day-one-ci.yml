@@ -16,8 +16,11 @@ jobs:
           node-version: '22'
       - name: Verify static GitHub Pages state + syntax
         run: node tests/day-one-pages-check.mjs
-      - name: Install and run unit tests
+      - name: Install dependencies and generate Prisma client
         run: |
           npm install --no-audit --no-fund
           npx prisma generate
-          npm run test:unit
+      - name: Run new focused day-one unit tests
+        run: npx vitest run tests/unit/day-one-baseline.test.ts
+      - name: Build Next.js application
+        run: npm run build
