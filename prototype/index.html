@@ -928,12 +928,12 @@
       return clean;
     }
 
-    let state = loadState();
-
     // One-time migration: existing browsers retain pre-reset data in a separate backup key.
     // The version flag prevents any future reload from erasing newly entered real transactions.
     const DAY_ONE_RESET_FLAG = 'TAKY_ERP_DAY_ONE_RESET_20261031';
     const DAY_ONE_BACKUP_KEY = 'TAKY_ERP_BEFORE_DAY_ONE_20261031';
+
+    let state = loadState();
 
     function loadState() {
       let previous = null;
