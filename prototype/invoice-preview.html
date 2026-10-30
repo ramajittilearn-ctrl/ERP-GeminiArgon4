@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ตัวอย่างหน้าตาใบแจ้งหนี้ Taky Apartment ERP (การ์ด LINE QR & สลิปกระดาษ A4)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Noto Sans Thai', 'Inter', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    .mono-num {
+      font-family: 'Inter', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-slip-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1.5px dashed #475569 !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <!-- Top Controls Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
+    <div class="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500 text-slate-950">Updated KBank Account</span>
+          <h1 class="font-bold text-base sm:text-lg">ใบแจ้งหนี้ Taky Apartment — ธ.กสิกรไทย 696-2-08678-9 (นายรามจิตติ ปสุตนาวิน)</h1>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">
+          อัปเดตโลโก้ธนาคารกสิกรไทย (KBank) เลขที่บัญชี <strong class="text-emerald-300">696-2-08678-9</strong> ชื่อบัญชี <strong class="text-emerald-300">นายรามจิตติ ปสุตนาวิน</strong> พร้อมช่องแก้ไขข้อมูลติดต่อหอพักแบบสดๆ
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" id="btn-mode-both" onclick="setViewMode('BOTH')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950">
+          👁️ ดูเทียบทั้ง 2 รูปแบบ
+        </button>
+        <button type="button" id="btn-mode-line" onclick="setViewMode('LINE')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700">
+          📲 เฉพาะการ์ดส่ง LINE
+        </button>
+        <button type="button" id="btn-mode-a4" onclick="setViewMode('A4')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700">
+          🖨️ เฉพาะหน้ากระดาษ A4 (2 ห้อง/แผ่น)
+        </button>
+      </div>
+    </div>
+
+    <!-- Scenario Switcher Bar -->
+    <div class="bg-slate-800/90 border-t border-slate-700/80">
+      <div class="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-slate-400 mr-1">คลิกเลือกดูกรณีตัวอย่างบิล:</span>
+          <button type="button" id="scen-NORMAL" onclick="selectScenario('NORMAL')" class="scen-btn px-3 py-1 rounded-md font-bold bg-emerald-600 text-white">
+            1. บิลปกติ (ห้อง 101 — ไฟ 115 หน่วย × 6.50 = 747.50 บ.)
+          </button>
+          <button type="button" id="scen-OVERDUE" onclick="selectScenario('OVERDUE')" class="scen-btn px-3 py-1 rounded-md font-medium bg-slate-700 text-slate-200 hover:bg-slate-600">
+            2. บิลมียอดค้างยกมา + ค่าปรับเกินวันที่ 5 (ห้อง 103)
+          </button>
+          <button type="button" id="scen-PARTIAL" onclick="selectScenario('PARTIAL')" class="scen-btn px-3 py-1 rounded-md font-medium bg-slate-700 text-slate-200 hover:bg-slate-600">
+            3. บิลแบ่งจ่ายแล้วบางส่วน (ห้อง 203 — หักยอดที่จ่ายแล้ว)
+          </button>
+          <button type="button" id="scen-ROLLOVER" onclick="selectScenario('ROLLOVER')" class="scen-btn px-3 py-1 rounded-md font-medium bg-slate-700 text-slate-200 hover:bg-slate-600">
+            4. บิลมิเตอร์ไฟวนรอบ 9985 → 0065 (ห้อง 202)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 pt-5 space-y-6">
+
+    <!-- Quick Contact Info & Bank Editor Bar -->
+    <section class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs no-print">
+      <div class="text-xs font-bold text-slate-800 mb-2.5 flex items-center justify-between">
+        <span>🏢 ข้อมูลการติดต่อหอพัก & บัญชีธนาคารบนหัว/ท้ายใบแจ้งหนี้ (ปรับแก้และแสดงผลบนบิลทันที)</span>
+        <span class="text-[11px] text-emerald-700 font-semibold">✔ บันทึกอัตโนมัติ</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div>
+          <label class="block text-slate-500 mb-1">ธนาคาร / เลขที่บัญชี</label>
+          <input type="text" id="cfg-bank-acc" oninput="updateInvoiceHeaderConfig()" value="696-2-08678-9" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold mono-num text-emerald-800" />
+        </div>
+        <div>
+          <label class="block text-slate-500 mb-1">ชื่อบัญชีรับโอน</label>
+          <input type="text" id="cfg-bank-owner" oninput="updateInvoiceHeaderConfig()" value="นายรามจิตติ ปสุตนาวิน" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-500 mb-1">เบอร์โทรศัพท์ / LINE ติดต่อหอพัก</label>
+          <input type="text" id="cfg-contact-phone" oninput="updateInvoiceHeaderConfig()" value="โทร. 092-825-5788 • LINE: @takyapartment" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800" />
+        </div>
+        <div>
+          <label class="block text-slate-500 mb-1">ที่อยู่หอพัก (แสดงใต้ชื่อ Taky Apartment)</label>
+          <input type="text" id="cfg-contact-addr" oninput="updateInvoiceHeaderConfig()" value="Taky Apartment (15 ห้อง • 3 ชั้น) ติดต่อผู้ดูแลคุณรามจิตติ" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800" />
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- FORMAT 1: MOBILE LINE INVOICE CARD + COPY TEXT PREVIEW              -->
+    <!-- =================================================================== -->
+    <section id="sec-line-format" class="space-y-3 no-print">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-emerald-600 text-white text-xs flex items-center justify-center">1</span>
+            <span>รูปแบบที่ 1: การ์ดใบแจ้งหนี้สำหรับส่งเข้าแชท LINE (พร้อมโลโก้ธนาคารกสิกรไทย + QR PromptPay)</span>
+          </h2>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Visual Mobile Card -->
+        <div class="lg:col-span-6 flex flex-col items-center">
+          <div id="line-card-preview" class="w-full max-w-md bg-white rounded-2xl border-2 border-slate-200 shadow-xl overflow-hidden"></div>
+        </div>
+
+        <!-- Accompanying LINE Chat Text Message -->
+        <div class="lg:col-span-6 space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                💬 ข้อความสรุปสำหรับกด Copy วางในแชท LINE คู่กับการ์ด
+              </span>
+              <button type="button" onclick="copyCurrentLineText()" class="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700">
+                📋 คัดลอกข้อความส่ง LINE
+              </button>
+            </div>
+            <pre id="line-chat-text-box" class="bg-slate-900 text-emerald-300 rounded-xl p-3.5 text-xs whitespace-pre-wrap leading-relaxed font-sans"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- FORMAT 2: A4 2-UP PAPER SLIP PRINT LAYOUT (สอดใต้ประตู)               -->
+    <!-- =================================================================== -->
+    <section id="sec-a4-format" class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3 no-print">
+        <div>
+          <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-slate-900 text-white text-xs flex items-center justify-center">2</span>
+            <span>รูปแบบที่ 2: สลิปกระดาษ A4 แบบ 2 คอลัมน์ พร้อมเส้นประตัดครึ่งสำหรับสอดใต้ประตู</span>
+          </h2>
+        </div>
+        <button type="button" onclick="window.print()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 shadow-sm">
+          🖨️ ทดสอบสั่งพิมพ์หน้ากระดาษ A4 (Print Preview)
+        </button>
+      </div>
+
+      <!-- Simulated A4 Sheet Container -->
+      <div class="bg-white rounded-2xl border border-slate-300 shadow-md p-5 sm:p-7 space-y-4">
+        <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-200 pb-2 no-print">
+          <span>ตัวอย่างแผ่นกระดาษ A4 (2 ห้องต่อแผ่น พร้อมโลโก้ธนาคารกสิกรไทย เลขบัญชี 696-2-08678-9 และ QR PromptPay)</span>
+          <span class="mono-num">A4 Print Sheet • 2-Up Slip Layout</span>
+        </div>
+
+        <div id="a4-slips-container" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 right-4 hidden bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg no-print">
+    คัดลอกข้อความสำหรับวางในแชท LINE เรียบร้อยแล้ว!
+  </div>
+
+  <script>
+    const HEADER_CONFIG = {
+      bankName: 'ธนาคารกสิกรไทย (KBank)',
+      bankAccount: '696-2-08678-9',
+      bankOwner: 'นายรามจิตติ ปสุตนาวิน',
+      contactPhone: 'โทร. 092-825-5788 • LINE: @takyapartment',
+      contactAddress: 'Taky Apartment (15 ห้อง • 3 ชั้น) ติดต่อผู้ดูแลคุณรามจิตติ'
+    };
+
+    const SCENARIOS = {
+      NORMAL: {
+        id: 'INV-202610-101',
+        roomNumber: '101',
+        floor: 1,
+        tenantName: 'คุณสมศักดิ์ มีสุข',
+        tier: 'STANDARD',
+        issueDate: '25 ต.ค. 2026',
+        dueDate: '5 พ.ย. 2026',
+        rentSatang: 250000,
+        prevWater: 120,
+        currWater: 128,
+        waterRoll: false,
+        waterUnits: 8,
+        waterRateSatang: 1000,
+        waterSatang: 8000,
+        prevElec: 1450,
+        currElec: 1565,
+        elecRoll: false,
+        elecUnits: 115,
+        elecRateSatang: 650,
+        elecSatang: 74750,
+        arrearsSatang: 0,
+        lateDays: 0,
+        lateFeeSatang: 0,
+        paidSatang: 0,
+        paidNote: '',
+        netDueSatang: 332750,
+        emvPayload: '00020101021229370016A000000677010111011300669282557885802TH530376454073327.5063049B1C'
+      },
+      OVERDUE: {
+        id: 'INV-202610-103',
+        roomNumber: '103',
+        floor: 1,
+        tenantName: 'คุณณัฐพล คนขยัน',
+        tier: 'GOLD',
+        issueDate: '25 ต.ค. 2026',
+        dueDate: '5 พ.ย. 2026 (เกินกำหนด 3 วัน)',
+        rentSatang: 350000,
+        prevWater: 210,
+        currWater: 219,
+        waterRoll: false,
+        waterUnits: 9,
+        waterRateSatang: 1000,
+        waterSatang: 9000,
+        prevElec: 2310,
+        currElec: 2465,
+        elecRoll: false,
+        elecUnits: 155,
+        elecRateSatang: 650,
+        elecSatang: 100750,
+        arrearsSatang: 120000,
+        lateDays: 3,
+        lateFeeSatang: 15000,
+        paidSatang: 0,
+        paidNote: '',
+        netDueSatang: 594750,
+        emvPayload: '00020101021229370016A000000677010111011300669282557885802TH530376454075947.5063044E2A'
+      },
+      PARTIAL: {
+        id: 'INV-202610-203',
+        roomNumber: '203',
+        floor: 2,
+        tenantName: 'คุณอนุชา ศรีสวัสดิ์',
+        tier: 'GOLD',
+        issueDate: '25 ต.ค. 2026',
+        dueDate: '5 พ.ย. 2026',
+        rentSatang: 350000,
+        prevWater: 95,
+        currWater: 103,
+        waterRoll: false,
+        waterUnits: 8,
+        waterRateSatang: 1000,
+        waterSatang: 8000,
+        prevElec: 1200,
+        currElec: 1345,
+        elecRoll: false,
+        elecUnits: 145,
+        elecRateSatang: 650,
+        elecSatang: 94250,
+        arrearsSatang: 0,
+        lateDays: 0,
+        lateFeeSatang: 0,
+        paidSatang: 200000,
+        paidNote: 'รับโอนงวดแรกเมื่อ 26 ต.ค. (แนบสลิป KBank แล้ว)',
+        netDueSatang: 252250,
+        emvPayload: '00020101021229370016A000000677010111011300669282557885802TH530376454072522.506304C819'
+      },
+      ROLLOVER: {
+        id: 'INV-202610-202',
+        roomNumber: '202',
+        floor: 2,
+        tenantName: 'คุณมณีรัตน์ ทองดี',
+        tier: 'SILVER',
+        issueDate: '25 ต.ค. 2026',
+        dueDate: '5 พ.ย. 2026',
+        rentSatang: 300000,
+        prevWater: 310,
+        currWater: 318,
+        waterRoll: false,
+        waterUnits: 8,
+        waterRateSatang: 1000,
+        waterSatang: 8000,
+        prevElec: 9985,
+        currElec: 65,
+        elecRoll: true,
+        elecUnits: 80,
+        elecRateSatang: 650,
+        elecSatang: 52000,
+        arrearsSatang: 0,
+        lateDays: 0,
+        lateFeeSatang: 0,
+        paidSatang: 0,
+        paidNote: '',
+        netDueSatang: 360000,
+        emvPayload: '00020101021229370016A000000677010111011300669282557885802TH530376454073600.006304A10F'
+      }
+    };
+
+    let activeScenarioKey = 'NORMAL';
+
+    function formatBaht(satang) {
+      return (satang / 100).toLocaleString('th-TH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    // Inline Vector SVG of Kasikornbank (KBank) Brand Badge (Works 100% offline & in Print)
+    function renderKBankLogoSvg() {
+      return `
+        <div class="flex items-center gap-2 bg-[#00a950] text-white px-2.5 py-1.5 rounded-lg shadow-xs">
+          <svg viewBox="0 0 40 40" class="w-7 h-7 shrink-0" aria-label="Kasikornbank Logo">
+            <circle cx="20" cy="20" r="18" fill="#ffffff" />
+            <circle cx="20" cy="20" r="15.5" fill="#00a950" />
+            <!-- Iconic Rice Sheaf & Flame Crest in KBank Green/Red/White -->
+            <path d="M20 7 C16 13, 14 19, 17 28 C18.5 23, 20 17, 20 7 Z" fill="#ffffff"/>
+            <path d="M23 10 C20 16, 19 22, 21 30 C23.5 24, 24.5 17, 23 10 Z" fill="#ffffff" opacity="0.9"/>
+            <circle cx="20" cy="31" r="2.2" fill="#e11d48"/>
+          </svg>
+          <div class="leading-tight">
+            <div class="text-[11px] font-extrabold tracking-wide">ธนาคารกสิกรไทย</div>
+            <div class="text-[9px] text-emerald-100 font-semibold tracking-wider">KASIKORNBANK (KBank)</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function generateQrSvg(seedKey) {
+      let hash = 2166136261;
+      for (let i = 0; i < seedKey.length; i++) {
+        hash ^= seedKey.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      const size = 21;
+      let rects = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const inTL = r < 7 && c < 7;
+          const inTR = r < 7 && c >= size - 7;
+          const inBL = r >= size - 7 && c < 7;
+          if (inTL || inTR || inBL) continue;
+          const bit = ((hash >>> ((r * size + c) % 28)) ^ (r * 31 + c * 17)) & 1;
+          if (bit) {
+            rects += `<rect x="${c * 6 + 6}" y="${r * 6 + 6}" width="6" height="6" fill="#0f172a"/>`;
+          }
+        }
+      }
+      function finder(x, y) {
+        return `
+          <rect x="${x}" y="${y}" width="42" height="42" fill="#0f172a" rx="4"/>
+          <rect x="${x + 6}" y="${y + 6}" width="30" height="30" fill="#ffffff" rx="2"/>
+          <rect x="${x + 12}" y="${y + 12}" width="18" height="18" fill="#0f172a" rx="2"/>
+        `;
+      }
+      return `
+        <svg viewBox="0 0 138 138" class="w-28 h-28 border border-slate-200 rounded-xl bg-white p-1">
+          ${finder(6, 6)}
+          ${finder(90, 6)}
+          ${finder(6, 90)}
+          ${rects}
+        </svg>
+      `;
+    }
+
+    function renderInvoiceCardHtml(inv, isPrintSlip) {
+      const qrSvg = generateQrSvg(inv.emvPayload);
+      const kbankLogo = renderKBankLogoSvg();
+      const grossTotal = inv.rentSatang + inv.waterSatang + inv.elecSatang + inv.arrearsSatang + inv.lateFeeSatang;
+
+      return `
+        <div class="${isPrintSlip ? 'print-slip-card rounded-xl p-4 border-2 border-dashed border-slate-400 bg-white' : 'p-5 bg-white'} space-y-3 text-xs">
+          <!-- Header Banner with Contact Info -->
+          <div class="flex items-start justify-between border-b border-slate-200 pb-3">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-1.5">
+                <span class="w-6 h-6 rounded-md bg-emerald-500 text-slate-950 font-black text-xs flex items-center justify-center">TA</span>
+                <span class="text-sm font-extrabold text-slate-900">Taky Apartment (ใบแจ้งหนี้/ใบเสร็จ)</span>
+              </div>
+              <div class="text-[11px] text-slate-600 font-medium">${HEADER_CONFIG.contactAddress}</div>
+              <div class="text-[11px] text-slate-500">${HEADER_CONFIG.contactPhone}</div>
+              <div class="text-[11px] text-slate-500 mono-num">เลขที่บิล: ${inv.id} • วันตัดรอบ: ${inv.issueDate}</div>
+              <div class="text-[11px] font-bold text-rose-600">กำหนดชำระภายใน: ${inv.dueDate} (เกินกำหนดปรับ 50 บ./วัน)</div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="inline-block px-3 py-1 rounded-xl bg-slate-900 text-white font-black text-sm mono-num">
+                ห้อง ${inv.roomNumber}
+              </div>
+              <div class="text-[11px] text-slate-700 font-semibold mt-1">${inv.tenantName}</div>
+              <div class="text-[10px] text-slate-500">แพ็กเกจ ${inv.tier} (21 ตร.ม.)</div>
+            </div>
+          </div>
+
+          <!-- Line Items Table -->
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500 text-[11px]">
+                <th class="py-1.5 text-left">รายการ</th>
+                <th class="py-1.5 text-right">เลขมิเตอร์ / รายละเอียด</th>
+                <th class="py-1.5 text-right">จำนวนเงิน (บาท)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr>
+                <td class="py-1.5 font-semibold text-slate-800">1. ค่าเช่าห้องพักรายเดือน</td>
+                <td class="py-1.5 text-right text-slate-500">แพ็กเกจ ${inv.tier} (1 เดือน)</td>
+                <td class="py-1.5 text-right font-bold mono-num">${formatBaht(inv.rentSatang)}</td>
+              </tr>
+              <tr>
+                <td class="py-1.5 font-semibold text-slate-800">2. ค่าน้ำประปา (ไม่มีขั้นต่ำ)</td>
+                <td class="py-1.5 text-right text-slate-600 mono-num">
+                  ${inv.prevWater} → ${inv.currWater} (${inv.waterUnits} หน่วย × 10.00)
+                </td>
+                <td class="py-1.5 text-right font-bold mono-num">${formatBaht(inv.waterSatang)}</td>
+              </tr>
+              <tr>
+                <td class="py-1.5 font-semibold text-slate-800">
+                  3. ค่าไฟฟ้า ${inv.elecRoll ? '<span class="px-1.5 py-0.5 text-[10px] rounded bg-amber-100 text-amber-800 font-bold">มิเตอร์วนรอบ</span>' : ''}
+                </td>
+                <td class="py-1.5 text-right text-slate-600 mono-num">
+                  ${inv.prevElec} → ${inv.currElec.toString().padStart(4, '0')} (${inv.elecUnits} หน่วย × 6.50)
+                </td>
+                <td class="py-1.5 text-right font-bold mono-num">${formatBaht(inv.elecSatang)}</td>
+              </tr>
+              <tr>
+                <td class="py-1 text-slate-400">4. ค่าบริการส่วนกลาง</td>
+                <td class="py-1 text-right text-emerald-600 font-medium">ฟรี (ไม่มีค่าส่วนกลาง)</td>
+                <td class="py-1 text-right text-slate-400 mono-num">0.00</td>
+              </tr>
+              ${inv.arrearsSatang > 0 ? `
+                <tr class="bg-rose-50/80 text-rose-800">
+                  <td class="py-1.5 font-bold">5. ยอดค้างชำระยกมาจากเดือนก่อน</td>
+                  <td class="py-1.5 text-right text-[11px]">ทบยอดอัตโนมัติ</td>
+                  <td class="py-1.5 text-right font-extrabold mono-num">+${formatBaht(inv.arrearsSatang)}</td>
+                </tr>
+              ` : ''}
+              ${inv.lateFeeSatang > 0 ? `
+                <tr class="bg-rose-50/80 text-rose-800">
+                  <td class="py-1.5 font-bold">6. ค่าปรับชำระล่าช้าเกินวันที่ 5</td>
+                  <td class="py-1.5 text-right text-[11px] mono-num">${inv.lateDays} วัน × 50.00 บาท/วัน</td>
+                  <td class="py-1.5 text-right font-extrabold mono-num">+${formatBaht(inv.lateFeeSatang)}</td>
+                </tr>
+              ` : ''}
+              ${inv.paidSatang > 0 ? `
+                <tr class="bg-emerald-50/80 text-emerald-800">
+                  <td class="py-1.5 font-bold">หัก: รับชำระแล้วบางส่วน (Partial Paid)</td>
+                  <td class="py-1.5 text-right text-[11px]">${inv.paidNote}</td>
+                  <td class="py-1.5 text-right font-extrabold mono-num">-${formatBaht(inv.paidSatang)}</td>
+                </tr>
+              ` : ''}
+            </tbody>
+          </table>
+
+          <!-- Net Due Highlight Bar -->
+          <div class="bg-slate-900 text-white rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold">ยอดสุทธิที่ต้องโอนชำระ (Net Amount Due)</div>
+              <div class="text-[10px] text-slate-300 mono-num">รวมทั้งสิ้น ${formatBaht(grossTotal)} บ. ${inv.paidSatang > 0 ? `(หักจ่ายแล้ว ${formatBaht(inv.paidSatang)} บ.)` : ''}</div>
+            </div>
+            <div class="text-xl font-black text-emerald-400 mono-num">
+              ฿${formatBaht(inv.netDueSatang)}
+            </div>
+          </div>
+
+          <!-- KBank Transfer Box + PromptPay QR Footer -->
+          <div class="flex items-center gap-3.5 bg-emerald-50/60 rounded-xl p-3 border border-emerald-200">
+            <div class="shrink-0">
+              ${qrSvg}
+            </div>
+            <div class="flex-1 space-y-1.5 text-[11px] text-slate-700">
+              ${kbankLogo}
+              <div class="pt-0.5">
+                <div>เลขที่บัญชี: <strong class="text-sm font-black text-[#008f43] mono-num">${HEADER_CONFIG.bankAccount}</strong></div>
+                <div>ชื่อบัญชี: <strong class="text-slate-900 font-bold">${HEADER_CONFIG.bankOwner}</strong></div>
+                <div>ยอดโอนสุทธิ: <strong class="text-emerald-700 font-extrabold mono-num">฿${formatBaht(inv.netDueSatang)} บาท</strong></div>
+              </div>
+              <div class="text-[10px] text-slate-500">สแกน QR PromptPay หรือโอนเข้าบัญชีธนาคารกสิกรไทยด้านบน แล้วส่งสลิปทาง LINE</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function buildLineText(inv) {
+      return [
+        `🏢 แจ้งค่าเช่า Taky Apartment — ห้อง ${inv.roomNumber}`,
+        `👤 ผู้เช่า: ${inv.tenantName} (แพ็กเกจ ${inv.tier})`,
+        `📅 รอบตัดบิล: ${inv.issueDate} | กำหนดชำระภายใน: ${inv.dueDate}`,
+        `────────────────────`,
+        `• ค่าเช่าห้องพัก: ${formatBaht(inv.rentSatang)} บาท`,
+        `• ค่าน้ำประปา (${inv.prevWater} → ${inv.currWater} = ${inv.waterUnits} หน่วย × 10 บ.): ${formatBaht(inv.waterSatang)} บาท`,
+        `• ค่าไฟฟ้า (${inv.prevElec} → ${inv.currElec.toString().padStart(4, '0')} = ${inv.elecUnits} หน่วย × 6.50 บ.): ${formatBaht(inv.elecSatang)} บาท`,
+        `• ค่าส่วนกลาง: 0.00 บาท (ฟรี)`,
+        inv.arrearsSatang > 0 ? `• ยอดค้างยกมาจากเดือนก่อน: +${formatBaht(inv.arrearsSatang)} บาท` : null,
+        inv.lateFeeSatang > 0 ? `• ค่าปรับเกินกำหนด (${inv.lateDays} วัน × 50 บ.): +${formatBaht(inv.lateFeeSatang)} บาท` : null,
+        inv.paidSatang > 0 ? `• หักชำระแล้วบางส่วน: -${formatBaht(inv.paidSatang)} บาท` : null,
+        `────────────────────`,
+        `✅ ยอดสุทธิที่ต้องโอน: ${formatBaht(inv.netDueSatang)} บาท`,
+        `🏦 โอนเข้าบัญชี: ธนาคารกสิกรไทย (KBank)`,
+        `🔢 เลขที่บัญชี: ${HEADER_CONFIG.bankAccount}`,
+        `👤 ชื่อบัญชี: ${HEADER_CONFIG.bankOwner}`,
+        `📞 ติดต่อหอพัก: ${HEADER_CONFIG.contactPhone}`
+      ].filter(Boolean).join('\n');
+    }
+
+    function updateInvoiceHeaderConfig() {
+      HEADER_CONFIG.bankAccount = document.getElementById('cfg-bank-acc').value.trim();
+      HEADER_CONFIG.bankOwner = document.getElementById('cfg-bank-owner').value.trim();
+      HEADER_CONFIG.contactPhone = document.getElementById('cfg-contact-phone').value.trim();
+      HEADER_CONFIG.contactAddress = document.getElementById('cfg-contact-addr').value.trim();
+      renderAll();
+    }
+
+    function selectScenario(key) {
+      activeScenarioKey = key;
+      ['NORMAL', 'OVERDUE', 'PARTIAL', 'ROLLOVER'].forEach(k => {
+        const btn = document.getElementById('scen-' + k);
+        if (!btn) return;
+        if (k === key) {
+          btn.className = 'scen-btn px-3 py-1 rounded-md font-bold bg-emerald-600 text-white';
+        } else {
+          btn.className = 'scen-btn px-3 py-1 rounded-md font-medium bg-slate-700 text-slate-200 hover:bg-slate-600';
+        }
+      });
+      renderAll();
+    }
+
+    function setViewMode(mode) {
+      const secLine = document.getElementById('sec-line-format');
+      const secA4 = document.getElementById('sec-a4-format');
+      if (mode === 'BOTH') {
+        secLine.classList.remove('hidden');
+        secA4.classList.remove('hidden');
+      } else if (mode === 'LINE') {
+        secLine.classList.remove('hidden');
+        secA4.classList.add('hidden');
+      } else {
+        secLine.classList.add('hidden');
+        secA4.classList.remove('hidden');
+      }
+    }
+
+    function copyCurrentLineText() {
+      const inv = SCENARIOS[activeScenarioKey];
+      const text = buildLineText(inv);
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text);
+        }
+      } catch (e) {}
+      const t = document.getElementById('toast');
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+
+    function renderAll() {
+      const inv = SCENARIOS[activeScenarioKey];
+      document.getElementById('line-card-preview').innerHTML = renderInvoiceCardHtml(inv, false);
+      document.getElementById('line-chat-text-box').textContent = buildLineText(inv);
+
+      const companionKey = activeScenarioKey === 'NORMAL' ? 'OVERDUE' : 'NORMAL';
+      const companionInv = SCENARIOS[companionKey];
+      document.getElementById('a4-slips-container').innerHTML =
+        renderInvoiceCardHtml(inv, true) + renderInvoiceCardHtml(companionInv, true);
+    }
+
+    window.addEventListener('DOMContentLoaded', renderAll);
+  </script>
+</body>
+</html>

@@ -1,0 +1,2463 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taky Apartment ERP — ระบบบริหารหอพัก 15 ห้อง (Prototype)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Noto Sans Thai', 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .mono-num {
+      font-family: 'Inter', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .print-slip-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1px dashed #64748b !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center font-bold text-slate-950 text-lg shadow-sm">
+          TA
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg tracking-tight">Taky Apartment ERP</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
+              15 ห้อง • 3 ชั้น (Local LAN)
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            ตัดรอบบิลวันที่ <span id="hdr-billing-day" class="text-slate-200 font-semibold">25</span> • กำหนดจ่ายวันที่ <span id="hdr-due-day" class="text-slate-200 font-semibold">5</span> • ค่าไฟ <span id="hdr-elec-rate" class="text-emerald-400 font-semibold">6.50</span> บ./หน่วย • ค่าน้ำ <span id="hdr-water-rate" class="text-sky-400 font-semibold">10.00</span> บ./หน่วย
+          </p>
+        </div>
+      </div>
+
+      <!-- Simulated Date Switcher for Testing Late Fees after the 5th -->
+      <div class="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-lg px-3 py-1.5 text-xs">
+        <span class="text-slate-400">จำลองวันที่ระบบ:</span>
+        <select id="sim-date-select" onchange="handleSimulatedDateChange(this.value)" class="bg-slate-900 text-amber-300 font-medium rounded px-2 py-1 border border-slate-700 focus:outline-none">
+          <option value="2026-10-25">25 ต.ค. 2026 (วันตัดรอบจดมิเตอร์)</option>
+          <option value="2026-11-03">3 พ.ย. 2026 (ก่อนครบกำหนดชำระ)</option>
+          <option value="2026-11-08">8 พ.ย. 2026 (เลยกำหนด 3 วัน — คิดค่าปรับอัตโนมัติ)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Main Module Tabs -->
+    <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto border-t border-slate-800/80 gap-1 pt-1">
+      <button type="button" id="tab-btn-rooms" onclick="switchTab('rooms')" class="tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 border-emerald-400 text-emerald-400 whitespace-nowrap flex items-center gap-2">
+        <span>🏢 1. ผังห้อง 15 ห้อง (Live Board)</span>
+      </button>
+      <button type="button" id="tab-btn-billing" onclick="switchTab('billing')" class="tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2">
+        <span>⚡ 2. จดมิเตอร์วันที่ 25 (15 ห้องหน้าเดียว)</span>
+      </button>
+      <button type="button" id="tab-btn-invoices" onclick="switchTab('invoices')" class="tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2">
+        <span>📲 3. ส่งบิล LINE (QR) & พิมพ์สลิป A4</span>
+      </button>
+      <button type="button" id="tab-btn-payments" onclick="switchTab('payments')" class="tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2">
+        <span>💰 4. รับชำระเงิน / แบ่งจ่าย & ค้างชำระ</span>
+        <span id="badge-unpaid-count" class="px-1.5 py-0.5 text-[11px] rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 mono-num">0</span>
+      </button>
+      <button type="button" id="tab-btn-settings" onclick="switchTab('settings')" class="tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2">
+        <span>⚙️ 5. รายจ่าย P&L & ตั้งค่าเรทหอพัก</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-5 space-y-6">
+
+    <!-- KPI Summary Strip (Always visible in non-print) -->
+    <section id="kpi-strip" class="grid grid-cols-2 lg:grid-cols-5 gap-3 no-print">
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs text-slate-500 font-medium">สถานะห้องพัก (15 ห้อง)</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpi-occupancy" class="text-xl font-bold text-slate-900 mono-num">12 / 15</span>
+          <span id="kpi-occupancy-sub" class="text-xs text-emerald-600 font-medium">ว่าง 1 • จอง 1 • ซ่อม 1</span>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs text-slate-500 font-medium">ยอดออกบิลรอบ 25 ต.ค.</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpi-billed-total" class="text-xl font-bold text-slate-900 mono-num">฿0.00</span>
+          <span class="text-xs text-slate-400">ไม่มีค่าส่วนกลาง</span>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs text-slate-500 font-medium">เก็บเงินได้แล้ว (Paid/Partial)</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpi-collected-total" class="text-xl font-bold text-emerald-600 mono-num">฿0.00</span>
+          <span id="kpi-collected-count" class="text-xs text-slate-500">0 บิล</span>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs text-slate-500 font-medium">ยอดค้างชำระ + ค่าปรับสะสม</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpi-outstanding-total" class="text-xl font-bold text-rose-600 mono-num">฿0.00</span>
+          <span id="kpi-latefee-badge" class="text-xs text-rose-500 font-medium">ค่าปรับ ฿0</span>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm col-span-2 lg:col-span-1">
+        <div class="text-xs text-slate-500 font-medium">กำไรสุทธิเดือนนี้ (Net P&L)</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpi-net-profit" class="text-xl font-bold text-indigo-600 mono-num">฿0.00</span>
+          <span id="kpi-expense-sub" class="text-xs text-slate-500">รายจ่าย ฿0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 1: 15-ROOM LIVE BOARD (ผังห้องพัก 15 ห้อง 3 ชั้น)                -->
+    <!-- =================================================================== -->
+    <section id="view-rooms" class="space-y-5 no-print">
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button type="button" onclick="setRoomFilter('ALL')" id="filter-btn-ALL" class="room-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white">ทั้งหมด (15)</button>
+          <button type="button" onclick="setRoomFilter('OCCUPIED')" id="filter-btn-OCCUPIED" class="room-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">มีผู้เช่า</button>
+          <button type="button" onclick="setRoomFilter('AVAILABLE')" id="filter-btn-AVAILABLE" class="room-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100">ห้องว่าง</button>
+          <button type="button" onclick="setRoomFilter('RESERVED')" id="filter-btn-RESERVED" class="room-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100">จองแล้ว</button>
+          <button type="button" onclick="setRoomFilter('OVERDUE')" id="filter-btn-OVERDUE" class="room-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-700 hover:bg-rose-100">มียอดค้างชำระ</button>
+          <button type="button" onclick="setRoomFilter('MAINTENANCE')" id="filter-btn-MAINTENANCE" class="room-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">ซ่อมบำรุง</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="room-search-input" oninput="handleRoomSearch(this.value)" placeholder="ค้นหาเลขห้อง หรือ ชื่อผู้เช่า..." class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 w-52 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <button type="button" onclick="openGoLiveSetupModal()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm">
+            🚀 ตั้งค่าข้อมูลจริง 15 ห้อง (Go-Live)
+          </button>
+          <button type="button" onclick="switchTab('billing')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+            ⚡ ไปหน้าจดมิเตอร์วันที่ 25
+          </button>
+        </div>
+      </div>
+
+      <!-- Floor 1, 2, 3 Container -->
+      <div id="floors-container" class="space-y-6"></div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 2: 25th BULK METER & BILLING GRID (ตารางคีย์มิเตอร์ 15 ห้อง)       -->
+    <!-- =================================================================== -->
+    <section id="view-billing" class="hidden space-y-4 no-print">
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">ตารางจดมิเตอร์น้ำ-ไฟ และออกบิลประจำวันที่ 25 (15 ห้องในหน้าเดียว)</h2>
+          <p class="text-xs text-slate-500 mt-0.5">
+            กรอกเฉพาะ <span class="font-semibold text-slate-700">เลขมิเตอร์น้ำใหม่</span> และ <span class="font-semibold text-slate-700">เลขมิเตอร์ไฟใหม่</span> ระบบจะคำนวณหน่วยสตางค์ (ค่าไฟ <span id="bill-info-elec">6.50</span> บ./หน่วย, ค่าน้ำ <span id="bill-info-water">10.00</span> บ./หน่วย, ไม่มีขั้นต่ำ, ไม่มีค่าส่วนกลาง) พร้อมดึงยอดค้างเดือนก่อนมาทบอัตโนมัติ
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="autoFillSampleReadings()" class="px-3 py-2 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
+            ✨ เติมเลขมิเตอร์ตัวอย่างอัตโนมัติ
+          </button>
+          <button type="button" onclick="commitBulkInvoices()" class="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+            ✅ ยืนยันและออกบิลประจำวันที่ 25 ทั้งหมด
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+        <table class="w-full text-xs text-left">
+          <thead class="bg-slate-900 text-slate-200 uppercase">
+            <tr>
+              <th class="py-3 px-3">ห้อง</th>
+              <th class="py-3 px-3">ผู้เช่า / แพ็กเกจ</th>
+              <th class="py-3 px-3 text-right">ค่าห้อง</th>
+              <th class="py-3 px-3 text-center bg-sky-950/60">มิเตอร์น้ำเก่า → ใหม่</th>
+              <th class="py-3 px-3 text-right bg-sky-950/60">ค่าน้ำ (บาท)</th>
+              <th class="py-3 px-3 text-center bg-amber-950/60">มิเตอร์ไฟเก่า → ใหม่</th>
+              <th class="py-3 px-3 text-right bg-amber-950/60">ค่าไฟ (บาท)</th>
+              <th class="py-3 px-3 text-right">ยอดค้างยกมา + ค่าปรับ</th>
+              <th class="py-3 px-3 text-right">ยอดสุทธิรอบ 25 ต.ค.</th>
+            </tr>
+          </thead>
+          <tbody id="bulk-meter-tbody" class="divide-y divide-slate-200"></tbody>
+          <tfoot id="bulk-meter-tfoot" class="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 3: DUAL INVOICE CENTER (ส่งการ์ด LINE + พิมพ์สลิปกระดาษ A4)       -->
+    <!-- =================================================================== -->
+    <section id="view-invoices" class="hidden space-y-4">
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3 no-print">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">ศูนย์ส่งใบแจ้งหนี้ทาง LINE (พร้อม QR PromptPay) และพิมพ์สลิปกระดาษ A4</h2>
+          <p class="text-xs text-slate-500">เลือกส่งการ์ดสรุปยอดพร้อม QR PromptPay ให้ผู้เช่าทาง LINE หรือสั่งพิมพ์สลิปกระดาษสอดใต้ประตูพร้อมกันทั้ง 15 ห้อง</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="inv-mode-line" onclick="setInvoiceSubmode('LINE')" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-sm">
+            📲 โหมดส่งการ์ด LINE + QR PromptPay
+          </button>
+          <button type="button" id="inv-mode-print" onclick="setInvoiceSubmode('PRINT')" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
+            🖨️ โหมดพิมพ์สลิปกระดาษ A4 (สอดใต้ประตู)
+          </button>
+        </div>
+      </div>
+
+      <!-- Submode 1: LINE Card + QR PromptPay -->
+      <div id="invoice-subview-line" class="grid grid-cols-1 lg:grid-cols-12 gap-5 no-print">
+        <!-- Left room bill selector -->
+        <div class="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-700">เลือกห้องเพื่อดูการ์ดใบแจ้งหนี้</span>
+            <span id="line-list-count" class="text-xs text-slate-500">12 รายการ</span>
+          </div>
+          <div id="line-invoice-selector-list" class="divide-y divide-slate-100 max-h-[540px] overflow-y-auto"></div>
+        </div>
+
+        <!-- Right Mobile LINE Bill Preview Card -->
+        <div class="lg:col-span-7 flex flex-col items-center">
+          <div id="line-bill-card-container" class="w-full max-w-md bg-white rounded-2xl border-2 border-slate-200 shadow-lg overflow-hidden"></div>
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-2 w-full max-w-md">
+            <button type="button" onclick="copyLineInvoiceText()" class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-sm">
+              📋 คัดลอกข้อความบิลส่ง LINE
+            </button>
+            <button type="button" onclick="openPaymentModalForSelectedInvoice()" class="py-2.5 px-4 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm">
+              💰 บันทึกรับเงินบิลนี้
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submode 2: A4 2-up Paper Slip Print View -->
+      <div id="invoice-subview-print" class="hidden space-y-4">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between gap-3 no-print">
+          <div class="text-xs text-amber-900">
+            <strong>โหมดพิมพ์สลิปกระดาษสอดใต้ประตู:</strong> จัดหน้ากระดาษ A4 แบบ 2 คอลัมน์ พร้อมเส้นประสำหรับตัดแบ่งครึ่ง (มีทั้งรายละเอียดมิเตอร์และ QR PromptPay บนกระดาษ)
+          </div>
+          <button type="button" onclick="triggerPrintSlips()" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 whitespace-nowrap">
+            🖨️ สั่งพิมพ์หน้ากระดาษ A4 (Print)
+          </button>
+        </div>
+        <div id="print-slips-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: PAYMENTS, PARTIAL PAYMENTS, ARREARS & MOVE-OUT SETTLEMENTS    -->
+    <!-- =================================================================== -->
+    <section id="view-payments" class="hidden space-y-5 no-print">
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">ระบบรับชำระเงิน แบ่งจ่าย (Partial Payment) แนบสลิป และติดตามยอดค้างชำระ</h2>
+          <p class="text-xs text-slate-500">
+            รองรับการทยอยจ่ายหลายงวดในบิลเดียว หากเลยวันที่ 5 ของเดือนถัดไปและยังมียอดคงเหลือ ระบบคำนวณค่าปรับรายวันอัตโนมัติ และยกยอดไปทบบิลวันที่ 25 เดือนถัดไป
+          </p>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="setPaymentFilter('UNPAID')" id="pay-filter-UNPAID" class="pay-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white">รอชำระ / จ่ายบางส่วน</button>
+          <button type="button" onclick="setPaymentFilter('PAID')" id="pay-filter-PAID" class="pay-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">ชำระครบแล้ว</button>
+          <button type="button" onclick="setPaymentFilter('ALL')" id="pay-filter-ALL" class="pay-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">ทั้งหมด</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+        <table class="w-full text-xs text-left">
+          <thead class="bg-slate-900 text-slate-200">
+            <tr>
+              <th class="py-3 px-3">เลขบิล / รอบ</th>
+              <th class="py-3 px-3">ห้อง / ผู้เช่า</th>
+              <th class="py-3 px-3 text-right">ยอดบิลตั้งต้น</th>
+              <th class="py-3 px-3 text-right">ค่าปรับเกินวันที่ 5</th>
+              <th class="py-3 px-3 text-right">ยอดรวมสุทธิ</th>
+              <th class="py-3 px-3 text-right">จ่ายแล้ว</th>
+              <th class="py-3 px-3 text-right">คงเหลือค้างจ่าย</th>
+              <th class="py-3 px-3 text-center">สถานะ / สลิป</th>
+              <th class="py-3 px-3 text-right">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="payments-table-tbody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+
+      <!-- Move-Out Settlements History Box -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">ประวัติใบสรุปคืนเงินประกันตอนย้ายออก (Move-Out Deposit Settlements)</h3>
+            <p class="text-xs text-slate-500">รายการคำนวณเงินประกันห้องหักค่าน้ำ-ไฟวันสุดท้าย ยอดค้างชำระ และค่าทำความสะอาด/ค่าเสียหาย</p>
+          </div>
+        </div>
+        <div id="settlements-history-list" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: EXPENSES, P&L & SYSTEM SETTINGS (รายจ่าย & ตั้งค่าหอพัก)       -->
+    <!-- =================================================================== -->
+    <section id="view-settings" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5 no-print">
+      <!-- Left: System Configuration -->
+      <div class="lg:col-span-6 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div class="border-b border-slate-200 pb-3">
+          <h2 class="text-base font-bold text-slate-900">⚙️ ตั้งค่าเรทราคาและกฎการคิดเงิน (Property Settings)</h2>
+          <p class="text-xs text-slate-500">ปรับเรทน้ำ-ไฟ (ไม่มีขั้นต่ำ) ราคาแพ็กเกจ ค่าปรับรายวัน และเบอร์ PromptPay สำหรับเจน QR</p>
+        </div>
+
+        <form id="settings-form" onsubmit="saveSettingsForm(event)" class="space-y-3 text-xs">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">อัตราค่าไฟ (บาท/หน่วย)</label>
+              <input type="number" step="0.01" id="set-elec-rate" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">อัตราค่าน้ำ (บาท/หน่วย - ไม่มีขั้นต่ำ)</label>
+              <input type="number" step="0.01" id="set-water-rate" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Standard Tier (บาท)</label>
+              <input type="number" step="100" id="set-tier-std" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Silver Tier (บาท)</label>
+              <input type="number" step="100" id="set-tier-silver" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Gold Tier (บาท)</label>
+              <input type="number" step="100" id="set-tier-gold" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">วันตัดรอบบิลทุกเดือน</label>
+              <input type="number" min="1" max="28" id="set-billing-day" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">วันครบกำหนดชำระ</label>
+              <input type="number" min="1" max="28" id="set-due-day" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ค่าปรับล่าช้า (บาท/วัน)</label>
+              <input type="number" step="10" id="set-late-fee" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">เบอร์ PromptPay / เลขผู้เสียภาษี</label>
+              <input type="text" id="set-promptpay" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">เงินประกันเริ่มต้น (เท่าของค่าห้อง)</label>
+              <select id="set-deposit-mult" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+                <option value="1">1 เดือน (1x ค่าห้อง)</option>
+                <option value="2">2 เดือน (2x ค่าห้อง)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between gap-2">
+            <button type="submit" class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm">
+              💾 บันทึกการตั้งค่าและคำนวณใหม่
+            </button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="exportDatabaseBackup()" class="px-3 py-2 rounded-lg bg-slate-800 text-white font-medium hover:bg-slate-700">
+                ⬇️ Backup (.json)
+              </button>
+              <button type="button" onclick="resetDemoDatabase()" class="px-3 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-medium hover:bg-rose-100">
+                🔄 รีเซ็ตข้อมูลตั้งต้น
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Right: Property Expenses & Monthly P&L -->
+      <div class="lg:col-span-6 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">📊 บัญชีรายจ่ายหอพัก & สรุปกำไรสุทธิ (Monthly P&L)</h2>
+            <p class="text-xs text-slate-500">บันทึกค่าซ่อมบำรุง ค่าทำความสะอาด และค่าไฟส่วนกลางของตึก</p>
+          </div>
+        </div>
+
+        <!-- Add Expense Mini Form -->
+        <form id="expense-form" onsubmit="handleAddExpense(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div class="sm:col-span-5">
+            <input type="text" id="exp-title" placeholder="รายการจ่าย (เช่น ซ่อมปั๊มน้ำชั้น 1)" class="w-full border border-slate-300 rounded-lg px-2.5 py-2" required />
+          </div>
+          <div class="sm:col-span-3">
+            <select id="exp-category" class="w-full border border-slate-300 rounded-lg px-2 py-2">
+              <option value="ซ่อมบำรุง">🔧 ซ่อมบำรุง</option>
+              <option value="ค่าไฟ/น้ำส่วนกลางตึก">⚡ น้ำ/ไฟส่วนกลางตึก</option>
+              <option value="ทำความสะอาด">🧹 ทำความสะอาด</option>
+              <option value="อุปกรณ์หอพัก">📦 อุปกรณ์หอพัก</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <input type="number" step="1" min="1" id="exp-amount" placeholder="จำนวนบาท" class="w-full border border-slate-300 rounded-lg px-2.5 py-2 mono-num" required />
+          </div>
+          <div class="sm:col-span-2">
+            <button type="submit" class="w-full h-full py-2 rounded-lg bg-slate-900 text-white font-bold hover:bg-slate-800">+ เพิ่ม</button>
+          </div>
+        </form>
+
+        <!-- Expense List -->
+        <div id="expense-list-container" class="divide-y divide-slate-100 max-h-60 overflow-y-auto text-xs"></div>
+
+        <!-- P&L Summary Box -->
+        <div id="pnl-summary-box" class="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: MOVE-IN & PRORATION TO 25th (ทำสัญญาเข้าอยู่ + หาร 30 วันชน 25) -->
+  <!-- ===================================================================== -->
+  <div id="modal-movein" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
+      <div class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h3 id="movein-modal-title" class="font-bold text-sm">ทำสัญญาเข้าอยู่ใหม่ — ห้อง 101</h3>
+          <p class="text-[11px] text-slate-400">เลือกแพ็กเกจห้องพัก คำนวณเงินประกัน และหารค่าเช่ารายวันชนวันที่ 25 อัตโนมัติ</p>
+        </div>
+        <button type="button" onclick="closeModal('modal-movein')" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+      </div>
+
+      <form id="form-movein" onsubmit="submitMoveInForm(event)" class="p-5 space-y-3.5 text-xs max-h-[82vh] overflow-y-auto">
+        <input type="hidden" id="mi-room-number" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล ผู้เช่า</label>
+            <input type="text" id="mi-tenant-name" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="เช่น คุณสมชาย ใจดี" required />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เบอร์โทรศัพท์ / LINE</label>
+            <input type="text" id="mi-tenant-phone" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" placeholder="08x-xxx-xxxx" required />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เลือกแพ็กเกจสัญญา (ข้อ 1ข)</label>
+            <select id="mi-tier" onchange="recalcMoveInPreview()" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold text-slate-900">
+              <option value="STANDARD">Standard — 2,500 บาท/เดือน</option>
+              <option value="SILVER">Silver — 3,000 บาท/เดือน</option>
+              <option value="GOLD" selected>Gold — 3,500 บาท/เดือน</option>
+              <option value="CUSTOM">กำหนดราคาพิเศษเอง (Custom)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ค่าเช่ารายเดือน (บาท)</label>
+            <input type="number" id="mi-monthly-rent" oninput="recalcMoveInPreview()" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num font-bold" required />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">วันย้ายเข้าอยู่</label>
+            <input type="date" id="mi-start-date" onchange="recalcMoveInPreview()" class="w-full border border-slate-300 rounded-lg px-2.5 py-2 mono-num" value="2026-10-10" required />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เงินประกัน (ข้อ 12ข)</label>
+            <select id="mi-deposit-mult" onchange="recalcMoveInPreview()" class="w-full border border-slate-300 rounded-lg px-2.5 py-2">
+              <option value="1">ประกัน 1 เดือน (1x)</option>
+              <option value="2">ประกัน 2 เดือน (2x)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">หักเงินจองที่จ่ายไว้ (บาท)</label>
+            <input type="number" id="mi-booking-credit" oninput="recalcMoveInPreview()" class="w-full border border-slate-300 rounded-lg px-2.5 py-2 mono-num text-emerald-700 font-bold" value="0" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+          <input type="checkbox" id="mi-prorate-toggle" onchange="recalcMoveInPreview()" checked class="w-4 h-4 accent-emerald-600" />
+          <label for="mi-prorate-toggle" class="text-emerald-950 font-medium">
+            หารค่าเช่ารายวัน (Prorate หาร 30 วันคงที่) นับจากวันเข้าอยู่จนถึงวันที่ 25 (ข้อ 9ก)
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เลขมิเตอร์น้ำตั้งต้นวันเข้าอยู่</label>
+            <input type="number" id="mi-init-water" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เลขมิเตอร์ไฟตั้งต้นวันเข้าอยู่</label>
+            <input type="number" id="mi-init-elec" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" required />
+          </div>
+        </div>
+
+        <!-- Live Proration & Deposit Summary Box -->
+        <div id="mi-calculation-preview" class="bg-slate-900 text-white rounded-xl p-3.5 space-y-1.5"></div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-movein')" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium">ยกเลิก</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700">✅ บันทึกสัญญาเข้าอยู่ & รับเงินแรกเข้า</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: RESERVATION (วางเงินจองห้องล่วงหน้า)                           -->
+  <!-- ===================================================================== -->
+  <div id="modal-reserve" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
+      <div class="bg-amber-600 text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h3 id="reserve-modal-title" class="font-bold text-sm">รับจองห้องพักล่วงหน้า — ห้อง 104</h3>
+          <p class="text-[11px] text-amber-100">ยอดเงินจองจะถูกนำไปหักออกจากยอดจ่ายวันเข้าอยู่อัตโนมัติ</p>
+        </div>
+        <button type="button" onclick="closeModal('modal-reserve')" class="text-amber-100 hover:text-white text-lg font-bold">✕</button>
+      </div>
+
+      <form id="form-reserve" onsubmit="submitReservationForm(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="res-room-number" />
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">ชื่อผู้จอง</label>
+          <input type="text" id="res-name" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="เช่น คุณกานดา รักสงบ" required />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เบอร์โทรศัพท์</label>
+            <input type="text" id="res-phone" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" placeholder="089-xxx-xxxx" required />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">วันที่นัดย้ายเข้า</label>
+            <input type="date" id="res-date" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" value="2026-11-01" required />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">แพ็กเกจที่จอง</label>
+            <select id="res-tier" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+              <option value="STANDARD">Standard (2,500 บ.)</option>
+              <option value="SILVER">Silver (3,000 บ.)</option>
+              <option value="GOLD" selected>Gold (3,500 บ.)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">เงินมัดจำจอง (บาท)</label>
+            <input type="number" id="res-deposit" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num font-bold" value="1000" required />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-reserve')" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700">ยกเลิก</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700">📌 ยืนยันการจองห้อง</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: RECORD PAYMENT / PARTIAL PAYMENT & SLIP UPLOAD               -->
+  <!-- ===================================================================== -->
+  <div id="modal-payment" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
+      <div class="bg-indigo-900 text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h3 id="pay-modal-title" class="font-bold text-sm">บันทึกรับชำระเงิน / แบ่งจ่าย</h3>
+          <p class="text-[11px] text-indigo-200">รองรับจ่ายเต็มจำนวน หรือแบ่งจ่ายบางส่วน (Partial Payment) พร้อมแนบสลิป</p>
+        </div>
+        <button type="button" onclick="closeModal('modal-payment')" class="text-indigo-200 hover:text-white text-lg font-bold">✕</button>
+      </div>
+
+      <form id="form-payment" onsubmit="submitPaymentForm(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="pay-invoice-id" />
+        <div id="pay-modal-summary" class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1"></div>
+
+        <div class="flex gap-2">
+          <button type="button" onclick="setPaymentAmountPreset('FULL')" class="flex-1 py-2 rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-800 font-bold hover:bg-indigo-100">
+            จ่ายเต็มยอดคงเหลือ
+          </button>
+          <button type="button" onclick="setPaymentAmountPreset('HALF')" class="flex-1 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-100">
+            แบ่งจ่ายครึ่งหนึ่ง (50%)
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ยอดเงินที่รับชำระครั้งนี้ (บาท)</label>
+            <input type="number" step="0.01" min="1" id="pay-amount-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num font-bold text-base text-emerald-700" required />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ช่องทางชำระเงิน</label>
+            <select id="pay-method-input" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+              <option value="PromptPay QR">สแกน PromptPay QR</option>
+              <option value="โอนผ่านธนาคาร">โอนบัญชีธนาคาร</option>
+              <option value="เงินสด">เงินสด</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">แนบรูปสลิปโอนเงิน / เลขอ้างอิง</label>
+          <input type="text" id="pay-slip-note" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="เช่น สลิป KBank เวลา 14:22 น. (แนบแล้ว)" value="สลิปโอนเงิน PromptPay (ตรวจสอบแล้ว)" />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-payment')" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700">ยกเลิก</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700">💰 ยืนยันการรับชำระเงิน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: MOVE-OUT & DEPOSIT SETTLEMENT (แจ้งย้ายออก & หักเงินประกัน)     -->
+  <!-- ===================================================================== -->
+  <div id="modal-moveout" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
+      <div class="bg-rose-900 text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h3 id="moveout-modal-title" class="font-bold text-sm">แจ้งย้ายออก & คำนวณคืนเงินประกันอัตโนมัติ</h3>
+          <p class="text-[11px] text-rose-200">หักค่าน้ำ-ไฟวันย้ายออก ยอดค้างชำระ และค่าทำความสะอาด/ความเสียหายจากเงินประกัน</p>
+        </div>
+        <button type="button" onclick="closeModal('modal-moveout')" class="text-rose-200 hover:text-white text-lg font-bold">✕</button>
+      </div>
+
+      <form id="form-moveout" onsubmit="submitMoveOutForm(event)" class="p-5 space-y-3.5 text-xs max-h-[82vh] overflow-y-auto">
+        <input type="hidden" id="mo-room-number" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">มิเตอร์น้ำครั้งก่อน → วันย้ายออก</label>
+            <div class="flex items-center gap-1.5">
+              <input type="number" id="mo-prev-water" disabled class="w-20 bg-slate-100 border border-slate-300 rounded-lg px-2 py-2 mono-num text-slate-500" />
+              <span>→</span>
+              <input type="number" id="mo-curr-water" oninput="recalcMoveOutPreview()" class="flex-1 border border-slate-300 rounded-lg px-2.5 py-2 mono-num font-bold" required />
+            </div>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">มิเตอร์ไฟครั้งก่อน → วันย้ายออก</label>
+            <div class="flex items-center gap-1.5">
+              <input type="number" id="mo-prev-elec" disabled class="w-20 bg-slate-100 border border-slate-300 rounded-lg px-2 py-2 mono-num text-slate-500" />
+              <span>→</span>
+              <input type="number" id="mo-curr-elec" oninput="recalcMoveOutPreview()" class="flex-1 border border-slate-300 rounded-lg px-2.5 py-2 mono-num font-bold" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ค่าทำความสะอาดห้อง (บาท)</label>
+            <input type="number" min="0" id="mo-cleaning-fee" oninput="recalcMoveOutPreview()" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" value="300" required />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ค่าซ่อมแซมความเสียหาย (บาท)</label>
+            <input type="number" min="0" id="mo-damage-fee" oninput="recalcMoveOutPreview()" class="w-full border border-slate-300 rounded-lg px-3 py-2 mono-num" value="0" required />
+          </div>
+        </div>
+
+        <div id="mo-settlement-preview" class="bg-slate-900 text-white rounded-xl p-4 space-y-1.5"></div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-moveout')" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700">ยกเลิก</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700">🏁 ยืนยันย้ายออก & ออกใบสรุปคืนเงินประกัน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 5: 15-ROOM GO-LIVE INITIAL SETUP GRID (ตั้งค่าข้อมูลจริง 15 ห้อง)    -->
+  <!-- ===================================================================== -->
+  <div id="modal-golive" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-6xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-indigo-950 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="font-bold text-sm">🚀 ตารางตั้งค่าผู้เช่าและเลขมิเตอร์ตั้งต้นจริงทั้ง 15 ห้อง (Go-Live Initial Setup)</h3>
+          <p class="text-[11px] text-indigo-200">กรอกชื่อผู้เช่าจริง แพ็กเกจ และเลขมิเตอร์น้ำ-ไฟตั้งต้นของห้อง 101–305 ในหน้าเดียว หรือกดปุ่มล้างชื่อตัวอย่างทั้งหมดให้เป็นห้องว่าง</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="clearAllRoomsToEmptyInModal()" class="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700">
+            🧹 ล้างชื่อตัวอย่างทั้งหมด (เริ่มจากห้องว่าง)
+          </button>
+          <button type="button" onclick="closeModal('modal-golive')" class="text-indigo-200 hover:text-white text-lg font-bold px-2">✕</button>
+        </div>
+      </div>
+
+      <div class="p-4 overflow-y-auto flex-1">
+        <table class="w-full text-xs text-left border-collapse">
+          <thead class="bg-slate-900 text-white">
+            <tr>
+              <th class="py-2.5 px-2.5">ห้อง</th>
+              <th class="py-2.5 px-2.5">สถานะห้อง</th>
+              <th class="py-2.5 px-2.5">ชื่อ-นามสกุล ผู้เช่าจริง</th>
+              <th class="py-2.5 px-2.5">เบอร์โทร</th>
+              <th class="py-2.5 px-2.5">แพ็กเกจสัญญา</th>
+              <th class="py-2.5 px-2.5 text-right">ค่าห้อง (บาท)</th>
+              <th class="py-2.5 px-2.5 text-right">มิเตอร์น้ำตั้งต้น</th>
+              <th class="py-2.5 px-2.5 text-right">มิเตอร์ไฟตั้งต้น</th>
+              <th class="py-2.5 px-2.5 text-right">ค้างชำระยกมา (บาท)</th>
+            </tr>
+          </thead>
+          <tbody id="golive-setup-tbody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+
+      <div class="bg-slate-50 px-5 py-3 border-t border-slate-200 flex items-center justify-between">
+        <span class="text-xs text-slate-500">เมื่อกดบันทึก ระบบจะใช้เลขมิเตอร์ชุดนี้เป็นเลขตั้งต้นสำหรับตัดบิลวันที่ 25 ทันที</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeModal('modal-golive')" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold">ยกเลิก</button>
+          <button type="button" onclick="saveGoLiveSetupGrid()" class="px-5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-sm">
+            ✅ บันทึกข้อมูลจริงทั้ง 15 ห้อง (พร้อมใช้งาน Go-Live)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-box" class="fixed bottom-4 right-4 z-50 hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 text-xs font-medium flex items-center gap-2 no-print">
+    <span class="text-emerald-400">✔</span>
+    <span id="toast-message">บันทึกข้อมูลเรียบร้อย</span>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION LOGIC & SATANG FINANCIAL ENGINE                           -->
+  <!-- ===================================================================== -->
+  <script>
+    const STORAGE_KEY = 'TAKY_ERP_PROTOTYPE_STATE_V1';
+
+    // Pure Satang Integer Helpers (1 THB = 100 Satang)
+    function toSatang(baht) {
+      return Math.round(Number(baht || 0) * 100);
+    }
+    function fromSatang(satang) {
+      return (Math.round(Number(satang || 0)) / 100);
+    }
+    function formatBaht(satang) {
+      const val = fromSatang(satang);
+      return val.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Meter consumption with 4-digit rollover support (9999 -> 0000)
+    function calcMeterUnits(prev, curr, isRollover) {
+      const p = parseInt(prev, 10) || 0;
+      const c = parseInt(curr, 10) || 0;
+      if (isRollover) {
+        return (10000 - p) + c;
+      }
+      return c - p;
+    }
+
+    // Proration formula: Monthly Rent / 30 fixed days * days up to the 25th
+    function calcProratedRentSatang(monthlyRentSatang, moveInDateStr, billingDay) {
+      const parts = (moveInDateStr || '2026-10-10').split('-');
+      const dayOfMonth = parseInt(parts[2], 10) || 1;
+      const dailyRateSatang = Math.round(monthlyRentSatang / 30);
+      let days = 0;
+      if (dayOfMonth <= billingDay) {
+        days = (billingDay - dayOfMonth) + 1;
+      } else {
+        days = (30 - dayOfMonth) + billingDay;
+      }
+      return {
+        dailyRateSatang: dailyRateSatang,
+        proratedDays: days,
+        proratedAmountSatang: dailyRateSatang * days
+      };
+    }
+
+    // Late fee calculation after the 5th of following month
+    function calcLateFeeSatang(invoice, simulatedDateStr, settings) {
+      if (!invoice || invoice.status === 'PAID' || invoice.status === 'ROLLED_OVER') return 0;
+      if ((invoice.balanceDueSatang || 0) <= 0) return 0;
+      const due = new Date(invoice.dueDate + 'T23:59:59');
+      const sim = new Date(simulatedDateStr + 'T12:00:00');
+      if (sim <= due) return 0;
+      const diffDays = Math.floor((sim - due) / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays) * settings.dailyLateFeeSatang;
+    }
+
+    // Deterministic SVG QR Code Generator for PromptPay Preview
+    function generatePromptPayQrSvg(promptPayId, amountSatang) {
+      const amountText = formatBaht(amountSatang);
+      const seedStr = String(promptPayId) + ':' + String(amountSatang);
+      let hash = 2166136261;
+      for (let i = 0; i < seedStr.length; i++) {
+        hash ^= seedStr.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      const size = 21;
+      let rects = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const inTL = r < 7 && c < 7;
+          const inTR = r < 7 && c >= size - 7;
+          const inBL = r >= size - 7 && c < 7;
+          if (inTL || inTR || inBL) continue;
+          const bit = ((hash >>> ((r * size + c) % 28)) ^ (r * 31 + c * 17)) & 1;
+          if (bit) {
+            rects += `<rect x="${c * 6 + 6}" y="${r * 6 + 6}" width="6" height="6" fill="#0f172a"/>`;
+          }
+        }
+      }
+      function finder(x, y) {
+        return `
+          <rect x="${x}" y="${y}" width="42" height="42" fill="#0f172a" rx="4"/>
+          <rect x="${x + 6}" y="${y + 6}" width="30" height="30" fill="#ffffff" rx="2"/>
+          <rect x="${x + 12}" y="${y + 12}" width="18" height="18" fill="#0f172a" rx="2"/>
+        `;
+      }
+      return `
+        <svg viewBox="0 0 138 138" class="w-32 h-32 mx-auto border border-slate-200 rounded-xl bg-white p-1" aria-label="PromptPay QR ${amountText}">
+          ${finder(6, 6)}
+          ${finder(90, 6)}
+          ${finder(6, 90)}
+          ${rects}
+        </svg>
+      `;
+    }
+
+    // Default Seed State (15 Rooms across 3 Floors matching Taky Apartment)
+    function createInitialState() {
+      const settings = {
+        apartmentName: 'Taky Apartment',
+        electricityRateSatang: 650, // 6.50 THB/unit
+        waterRateSatang: 1000,      // 10.00 THB/unit (no minimum)
+        commonFeeSatang: 0,         // 0 THB (no common fee)
+        billingDay: 25,
+        dueDayNextMonth: 5,
+        dailyLateFeeSatang: 5000,   // 50 THB/day after the 5th
+        defaultDepositMonths: 1,
+        promptPayId: '092-825-5788',
+        bankName: 'ธนาคารกสิกรไทย (KBank)',
+        bankAccount: '696-2-08678-9',
+        bankOwner: 'นายรามจิตติ ปสุตนาวิน',
+        contactInfo: 'โทร. 092-825-5788 • LINE: @takyapartment',
+        tierStandardSatang: 250000, // 2,500 THB
+        tierSilverSatang: 300000,   // 3,000 THB
+        tierGoldSatang: 350000      // 3,500 THB
+      };
+
+      const rooms = [
+        // Floor 1
+        { roomNumber: '101', floor: 1, status: 'OCCUPIED', tier: 'STANDARD', rentSatang: 250000, depositSatang: 250000, tenantName: 'คุณสมศักดิ์ มีสุข', phone: '081-412-8891', startDate: '2026-03-01', prevWater: 120, currWater: 128, waterRoll: false, prevElec: 1450, currElec: 1565, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '102', floor: 1, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณวิภาดา สายชล', phone: '089-221-3344', startDate: '2026-04-01', prevWater: 85, currWater: 92, waterRoll: false, prevElec: 980, currElec: 1110, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '103', floor: 1, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 700000, tenantName: 'คุณณัฐพล คนขยัน', phone: '086-778-9012', startDate: '2026-02-01', prevWater: 210, currWater: 219, waterRoll: false, prevElec: 2310, currElec: 2465, elecRoll: false, arrearsSatang: 120000 }, // มียอดค้างยกมา 1,200 บ.
+        { roomNumber: '104', floor: 1, status: 'RESERVED', tier: 'SILVER', rentSatang: 300000, depositSatang: 0, tenantName: 'คุณกานดา (จองแล้ว)', phone: '082-991-1122', startDate: '2026-11-01', bookingDepositSatang: 100000, prevWater: 64, currWater: 64, waterRoll: false, prevElec: 620, currElec: 620, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '105', floor: 1, status: 'AVAILABLE', tier: 'STANDARD', rentSatang: 250000, depositSatang: 0, tenantName: '', phone: '', startDate: '', prevWater: 40, currWater: 40, waterRoll: false, prevElec: 510, currElec: 510, elecRoll: false, arrearsSatang: 0 },
+
+        // Floor 2
+        { roomNumber: '201', floor: 2, status: 'OCCUPIED', tier: 'STANDARD', rentSatang: 250000, depositSatang: 250000, tenantName: 'คุณปิยะพงษ์ วงศ์คำ', phone: '084-556-7788', startDate: '2026-05-01', prevWater: 150, currWater: 156, waterRoll: false, prevElec: 1890, currElec: 1985, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '202', floor: 2, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณมณีรัตน์ ทองดี', phone: '081-990-4512', startDate: '2026-01-01', prevWater: 310, currWater: 318, waterRoll: false, prevElec: 9985, currElec: 65, elecRoll: true, arrearsSatang: 0 }, // ตัวอย่างมิเตอร์ไฟวนรอบ 9985 -> 0065
+        { roomNumber: '203', floor: 2, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 350000, tenantName: 'คุณอนุชา ศรีสวัสดิ์', phone: '083-114-5678', startDate: '2026-06-01', prevWater: 95, currWater: 103, waterRoll: false, prevElec: 1200, currElec: 1345, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '204', floor: 2, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณชลธิชา นาคิน', phone: '089-654-3210', startDate: '2026-07-01', prevWater: 72, currWater: 79, waterRoll: false, prevElec: 840, currElec: 950, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '205', floor: 2, status: 'MAINTENANCE', tier: 'STANDARD', rentSatang: 250000, depositSatang: 0, tenantName: 'ซ่อมแอร์ / ทาสีใหม่', phone: '-', startDate: '', prevWater: 110, currWater: 110, waterRoll: false, prevElec: 1320, currElec: 1320, elecRoll: false, arrearsSatang: 0 },
+
+        // Floor 3
+        { roomNumber: '301', floor: 3, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 700000, tenantName: 'คุณธนกฤต พัฒนา', phone: '081-777-2345', startDate: '2026-03-01', prevWater: 180, currWater: 188, waterRoll: false, prevElec: 2100, currElec: 2240, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '302', floor: 3, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 350000, tenantName: 'คุณอารยา ใจงาม', phone: '085-332-1987', startDate: '2026-05-01', prevWater: 140, currWater: 146, waterRoll: false, prevElec: 1650, currElec: 1790, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '303', floor: 3, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณวรพจน์ สุขสันต์', phone: '087-889-0011', startDate: '2026-08-01', prevWater: 54, currWater: 60, waterRoll: false, prevElec: 590, currElec: 695, elecRoll: false, arrearsSatang: 85000 }, // มียอดค้างยกมา 850 บ.
+        { roomNumber: '304', floor: 3, status: 'OCCUPIED', tier: 'STANDARD', rentSatang: 250000, depositSatang: 250000, tenantName: 'คุณสุดาพร อินทร์จันทร์', phone: '082-445-6677', startDate: '2026-09-01', prevWater: 33, currWater: 39, waterRoll: false, prevElec: 410, currElec: 500, elecRoll: false, arrearsSatang: 0 },
+        { roomNumber: '305', floor: 3, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 350000, tenantName: 'คุณกิตติพงศ์ ยิ่งเจริญ', phone: '080-123-9876', startDate: '2026-04-01', prevWater: 165, currWater: 174, waterRoll: false, prevElec: 1920, currElec: 2050, elecRoll: false, arrearsSatang: 0 }
+      ];
+
+      // Generate initial invoices for the 12 occupied rooms as of 25 Oct 2026
+      const invoices = [];
+      rooms.forEach((rm, idx) => {
+        if (rm.status !== 'OCCUPIED') return;
+        const wUnits = calcMeterUnits(rm.prevWater, rm.currWater, rm.waterRoll);
+        const eUnits = calcMeterUnits(rm.prevElec, rm.currElec, rm.elecRoll);
+        const wSatang = wUnits * settings.waterRateSatang;
+        const eSatang = eUnits * settings.electricityRateSatang;
+        const totalSatang = rm.rentSatang + wSatang + eSatang + (rm.arrearsSatang || 0);
+
+        // Pre-populate realistic payment states: some paid, some partial, some unpaid
+        let paidSatang = 0;
+        let status = 'ISSUED';
+        const payments = [];
+        if (idx === 0 || idx === 1 || idx === 5) {
+          paidSatang = totalSatang;
+          status = 'PAID';
+          payments.push({
+            paidAt: '2026-10-26 10:15',
+            amountSatang: totalSatang,
+            method: 'PromptPay QR',
+            slipNote: 'สลิป PromptPay QR (ชำระเต็มจำนวน)'
+          });
+        } else if (rm.roomNumber === '203') {
+          paidSatang = 200000; // จ่ายบางส่วน 2,000 บาท
+          status = 'PARTIAL';
+          payments.push({
+            paidAt: '2026-10-26 18:40',
+            amountSatang: 200000,
+            method: 'โอนผ่านธนาคาร',
+            slipNote: 'สลิป KBank แบ่งจ่ายงวดแรก 2,000 บ.'
+          });
+        }
+
+        invoices.push({
+          id: 'INV-202610-' + rm.roomNumber,
+          roomNumber: rm.roomNumber,
+          tenantName: rm.tenantName,
+          tier: rm.tier,
+          billingPeriod: '2026-10',
+          issueDate: '2026-10-25',
+          dueDate: '2026-11-05',
+          rentSatang: rm.rentSatang,
+          prevWater: rm.prevWater,
+          currWater: rm.currWater,
+          waterRoll: rm.waterRoll,
+          waterUnits: wUnits,
+          waterSatang: wSatang,
+          prevElec: rm.prevElec,
+          currElec: rm.currElec,
+          elecRoll: rm.elecRoll,
+          elecUnits: eUnits,
+          elecSatang: eSatang,
+          arrearsSatang: rm.arrearsSatang || 0,
+          totalSatang: totalSatang,
+          paidSatang: paidSatang,
+          balanceDueSatang: totalSatang - paidSatang,
+          status: status,
+          payments: payments
+        });
+      });
+
+      const expenses = [
+        { id: 'EXP-1', date: '2026-10-12', category: 'ค่าไฟ/น้ำส่วนกลางตึก', title: 'ค่าไฟโถงทางเดินและปั๊มน้ำส่วนกลาง ต.ค.', amountSatang: 145000 },
+        { id: 'EXP-2', date: '2026-10-18', category: 'ซ่อมบำรุง', title: 'ล้างแอร์และเช็กน้ำยาแอร์ห้อง 205', amountSatang: 60000 },
+        { id: 'EXP-3', date: '2026-10-24', category: 'ทำความสะอาด', title: 'ค่าแม่บ้านทำความสะอาดส่วนกลาง 3 ชั้น', amountSatang: 150000 }
+      ];
+
+      const settlements = [
+        {
+          id: 'SET-202609-105',
+          roomNumber: '105',
+          tenantName: 'คุณพีรพล (ย้ายออกเมื่อ 25 ก.ย.)',
+          moveOutDate: '2026-09-25',
+          depositHeldSatang: 250000,
+          finalWaterSatang: 7000,
+          finalElecSatang: 58500,
+          cleaningFeeSatang: 30000,
+          damageFeeSatang: 0,
+          arrearsSatang: 0,
+          netRefundSatang: 154500
+        }
+      ];
+
+      return {
+        simulatedDate: '2026-10-25',
+        activeTab: 'rooms',
+        roomFilter: 'ALL',
+        roomSearch: '',
+        invoiceSubmode: 'LINE',
+        selectedInvoiceId: 'INV-202610-103',
+        paymentFilter: 'UNPAID',
+        settings: settings,
+        rooms: rooms,
+        invoices: invoices,
+        expenses: expenses,
+        settlements: settlements
+      };
+    }
+
+    let state = loadState();
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.rooms) && parsed.rooms.length === 15) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        // Fallback to in-memory state if localStorage is restricted
+      }
+      return createInitialState();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        // Ignore storage errors in sandboxed iframe
+      }
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('toast-box');
+      const label = document.getElementById('toast-message');
+      if (!box || !label) return;
+      label.textContent = msg;
+      box.classList.remove('hidden');
+      if (window._toastTimer) clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        box.classList.add('hidden');
+      }, 3200);
+    }
+
+    // Tab Navigation
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      const tabs = ['rooms', 'billing', 'invoices', 'payments', 'settings'];
+      tabs.forEach(t => {
+        const view = document.getElementById('view-' + t);
+        const btn = document.getElementById('tab-btn-' + t);
+        if (view) {
+          if (t === tabName) view.classList.remove('hidden');
+          else view.classList.add('hidden');
+        }
+        if (btn) {
+          if (t === tabName) {
+            btn.className = 'tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 border-emerald-400 text-emerald-400 whitespace-nowrap flex items-center gap-2';
+          } else {
+            btn.className = 'tab-nav-btn px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2';
+          }
+        }
+      });
+      renderAll();
+    }
+
+    function handleSimulatedDateChange(newDateStr) {
+      state.simulatedDate = newDateStr;
+      saveState();
+      renderAll();
+      if (newDateStr > '2026-11-05') {
+        showToast('จำลองวันที่เลยกำหนดชำระวันที่ 5: ระบบคำนวณค่าปรับรายวันอัตโนมัติแล้ว');
+      } else {
+        showToast('เปลี่ยนวันที่จำลองระบบเป็น ' + newDateStr);
+      }
+    }
+
+    // Find active invoice for a room
+    function getRoomInvoice(roomNumber) {
+      return state.invoices.find(inv => inv.roomNumber === roomNumber && inv.status !== 'ROLLED_OVER');
+    }
+
+    // Render Top Header & KPI Strip
+    function renderHeaderAndKpis() {
+      const s = state.settings;
+      document.getElementById('hdr-billing-day').textContent = s.billingDay;
+      document.getElementById('hdr-due-day').textContent = s.dueDayNextMonth;
+      document.getElementById('hdr-elec-rate').textContent = formatBaht(s.electricityRateSatang);
+      document.getElementById('hdr-water-rate').textContent = formatBaht(s.waterRateSatang);
+      document.getElementById('bill-info-elec').textContent = formatBaht(s.electricityRateSatang);
+      document.getElementById('bill-info-water').textContent = formatBaht(s.waterRateSatang);
+      document.getElementById('sim-date-select').value = state.simulatedDate;
+
+      const occupied = state.rooms.filter(r => r.status === 'OCCUPIED').length;
+      const available = state.rooms.filter(r => r.status === 'AVAILABLE').length;
+      const reserved = state.rooms.filter(r => r.status === 'RESERVED').length;
+      const maint = state.rooms.filter(r => r.status === 'MAINTENANCE').length;
+
+      document.getElementById('kpi-occupancy').textContent = `${occupied} / 15`;
+      document.getElementById('kpi-occupancy-sub').textContent = `ว่าง ${available} • จอง ${reserved} • ซ่อม ${maint}`;
+
+      let totalBilled = 0;
+      let totalCollected = 0;
+      let paidCount = 0;
+      let totalOutstanding = 0;
+      let totalLateFees = 0;
+      let unpaidCount = 0;
+
+      state.invoices.forEach(inv => {
+        if (inv.status === 'ROLLED_OVER') return;
+        const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, s);
+        totalBilled += inv.totalSatang;
+        totalCollected += inv.paidSatang;
+        if (inv.paidSatang > 0) paidCount++;
+        if (inv.balanceDueSatang > 0) {
+          unpaidCount++;
+          totalOutstanding += (inv.balanceDueSatang + lateSatang);
+          totalLateFees += lateSatang;
+        }
+      });
+
+      const totalExpense = state.expenses.reduce((acc, ex) => acc + ex.amountSatang, 0);
+      const netProfit = totalCollected - totalExpense;
+
+      document.getElementById('kpi-billed-total').textContent = '฿' + formatBaht(totalBilled);
+      document.getElementById('kpi-collected-total').textContent = '฿' + formatBaht(totalCollected);
+      document.getElementById('kpi-collected-count').textContent = `รับชำระแล้ว ${paidCount} รายการ`;
+      document.getElementById('kpi-outstanding-total').textContent = '฿' + formatBaht(totalOutstanding);
+      document.getElementById('kpi-latefee-badge').textContent = `รวมค่าปรับ ฿${formatBaht(totalLateFees)}`;
+      document.getElementById('kpi-net-profit').textContent = '฿' + formatBaht(netProfit);
+      document.getElementById('kpi-expense-sub').textContent = `หักรายจ่าย ฿${formatBaht(totalExpense)}`;
+      document.getElementById('badge-unpaid-count').textContent = String(unpaidCount);
+    }
+
+    // =========================================================================
+    // TAB 1 RENDERER: 15-ROOM LIVE BOARD
+    // =========================================================================
+    function setRoomFilter(filter) {
+      state.roomFilter = filter;
+      ['ALL', 'OCCUPIED', 'AVAILABLE', 'RESERVED', 'OVERDUE', 'MAINTENANCE'].forEach(f => {
+        const btn = document.getElementById('filter-btn-' + f);
+        if (!btn) return;
+        if (f === filter) {
+          btn.className = 'room-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white';
+        } else {
+          btn.className = 'room-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200';
+        }
+      });
+      renderRoomsBoard();
+    }
+
+    function handleRoomSearch(val) {
+      state.roomSearch = (val || '').trim().toLowerCase();
+      renderRoomsBoard();
+    }
+
+    function renderRoomsBoard() {
+      const container = document.getElementById('floors-container');
+      if (!container) return;
+      let html = '';
+
+      for (let floor = 1; floor <= 3; floor++) {
+        const floorRooms = state.rooms.filter(rm => {
+          if (rm.floor !== floor) return false;
+          const inv = getRoomInvoice(rm.roomNumber);
+          const hasUnpaid = inv && inv.balanceDueSatang > 0;
+          if (state.roomFilter === 'OCCUPIED' && rm.status !== 'OCCUPIED') return false;
+          if (state.roomFilter === 'AVAILABLE' && rm.status !== 'AVAILABLE') return false;
+          if (state.roomFilter === 'RESERVED' && rm.status !== 'RESERVED') return false;
+          if (state.roomFilter === 'MAINTENANCE' && rm.status !== 'MAINTENANCE') return false;
+          if (state.roomFilter === 'OVERDUE' && !hasUnpaid) return false;
+          if (state.roomSearch) {
+            const hay = (rm.roomNumber + ' ' + (rm.tenantName || '') + ' ' + (rm.tier || '')).toLowerCase();
+            if (!hay.includes(state.roomSearch)) return false;
+          }
+          return true;
+        });
+
+        if (floorRooms.length === 0) continue;
+
+        html += `
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-6 h-6 rounded-md bg-slate-900 text-white text-xs flex items-center justify-center font-bold">${floor}</span>
+                <span>ชั้นที่ ${floor} (ห้อง ${floor}01 – ${floor}05 • ขนาด 21 ตร.ม.)</span>
+              </h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              ${floorRooms.map(rm => renderSingleRoomCard(rm)).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      if (!html) {
+        html = `<div class="bg-white rounded-xl p-8 text-center text-sm text-slate-500 border border-slate-200">ไม่พบห้องพักตามตัวกรองที่เลือก</div>`;
+      }
+      container.innerHTML = html;
+    }
+
+    function renderSingleRoomCard(rm) {
+      const inv = getRoomInvoice(rm.roomNumber);
+      const lateSatang = inv ? calcLateFeeSatang(inv, state.simulatedDate, state.settings) : 0;
+      const totalDueSatang = inv ? (inv.balanceDueSatang + lateSatang) : 0;
+
+      let statusBadge = '';
+      let borderClass = 'border-slate-200';
+      if (rm.status === 'OCCUPIED') {
+        if (totalDueSatang > 0 && lateSatang > 0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-300">เลยกำหนด + ค่าปรับ</span>`;
+          borderClass = 'border-rose-300 ring-1 ring-rose-200';
+        } else if (inv && inv.status === 'PARTIAL') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">แบ่งจ่ายแล้วบางส่วน</span>`;
+          borderClass = 'border-amber-300';
+        } else if (totalDueSatang > 0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">รอชำระบิล 25 ต.ค.</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">ชำระครบแล้ว</span>`;
+        }
+      } else if (rm.status === 'AVAILABLE') {
+        statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500 text-white">ห้องว่างพร้อมเช่า</span>`;
+        borderClass = 'border-emerald-400 ring-1 ring-emerald-100';
+      } else if (rm.status === 'RESERVED') {
+        statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500 text-white">วางเงินจองแล้ว</span>`;
+        borderClass = 'border-amber-400';
+      } else {
+        statusBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">กำลังซ่อมบำรุง</span>`;
+      }
+
+      const tierBadgeColor = rm.tier === 'GOLD'
+        ? 'bg-amber-50 text-amber-800 border-amber-200'
+        : rm.tier === 'SILVER'
+          ? 'bg-slate-100 text-slate-700 border-slate-300'
+          : 'bg-sky-50 text-sky-800 border-sky-200';
+
+      let actionsHtml = '';
+      if (rm.status === 'AVAILABLE') {
+        actionsHtml = `
+          <div class="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100">
+            <button type="button" onclick="openMoveInModal('${rm.roomNumber}')" class="py-1.5 px-2 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700">
+              + ทำสัญญาเข้าอยู่
+            </button>
+            <button type="button" onclick="openReserveModal('${rm.roomNumber}')" class="py-1.5 px-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold hover:bg-amber-100">
+              📌 รับจองห้อง
+            </button>
+          </div>
+        `;
+      } else if (rm.status === 'RESERVED') {
+        actionsHtml = `
+          <div class="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100">
+            <button type="button" onclick="openMoveInModal('${rm.roomNumber}')" class="py-1.5 px-2 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700">
+              ✅ เข้าอยู่ (หักเงินจอง)
+            </button>
+            <button type="button" onclick="cancelReservation('${rm.roomNumber}')" class="py-1.5 px-2 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-medium hover:bg-slate-200">
+              ยกเลิกจอง
+            </button>
+          </div>
+        `;
+      } else if (rm.status === 'OCCUPIED') {
+        actionsHtml = `
+          <div class="grid grid-cols-3 gap-1 pt-2 border-t border-slate-100">
+            <button type="button" onclick="viewRoomLineInvoice('${rm.roomNumber}')" class="py-1.5 px-1.5 rounded-lg bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-800">
+              📲 บิล LINE
+            </button>
+            <button type="button" onclick="openPaymentModalForRoom('${rm.roomNumber}')" class="py-1.5 px-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold hover:bg-indigo-100">
+              💰 รับเงิน
+            </button>
+            <button type="button" onclick="openMoveOutModal('${rm.roomNumber}')" class="py-1.5 px-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-semibold hover:bg-rose-100">
+              ย้ายออก
+            </button>
+          </div>
+        `;
+      } else {
+        actionsHtml = `
+          <div class="pt-2 border-t border-slate-100">
+            <button type="button" onclick="markMaintenanceDone('${rm.roomNumber}')" class="w-full py-1.5 px-2 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700">
+              ✔ ซ่อมเสร็จ (เปิดเป็นห้องว่าง)
+            </button>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="bg-white rounded-xl p-3.5 border ${borderClass} shadow-xs flex flex-col justify-between space-y-2.5">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-base font-extrabold text-slate-900 mono-num">ห้อง ${rm.roomNumber}</span>
+              ${statusBadge}
+            </div>
+
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="px-2 py-0.5 rounded border font-semibold ${tierBadgeColor}">${rm.tier}</span>
+              <span class="font-bold text-slate-800 mono-num">฿${formatBaht(rm.rentSatang)}/ด.</span>
+            </div>
+
+            <div class="text-xs text-slate-700 truncate font-medium">
+              ${rm.tenantName ? `👤 ${rm.tenantName}` : '<span class="text-slate-400">ยังไม่มีผู้เช่า</span>'}
+            </div>
+
+            <div class="bg-slate-50 rounded-lg p-2 text-[11px] space-y-1 border border-slate-100">
+              <div class="flex justify-between text-slate-500">
+                <span>💧 มิเตอร์น้ำ: <strong class="text-slate-800 mono-num">${rm.currWater}</strong></span>
+                <span>⚡ ไฟ: <strong class="text-slate-800 mono-num">${rm.currElec}</strong></span>
+              </div>
+              ${rm.status === 'OCCUPIED' ? `
+                <div class="flex justify-between items-center pt-1 border-t border-slate-200/70">
+                  <span class="text-slate-500">ค้างชำระสุทธิ:</span>
+                  <span class="font-bold mono-num ${totalDueSatang > 0 ? 'text-rose-600' : 'text-emerald-600'}">฿${formatBaht(totalDueSatang)}</span>
+                </div>
+              ` : rm.status === 'RESERVED' ? `
+                <div class="flex justify-between items-center pt-1 border-t border-slate-200/70">
+                  <span class="text-amber-700">เงินมัดจำจอง:</span>
+                  <span class="font-bold mono-num text-amber-700">฿${formatBaht(rm.bookingDepositSatang || 0)}</span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          ${actionsHtml}
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // TAB 2 RENDERER: 25th BULK METER ENTRY & LIVE SATANG CALCULATION
+    // =========================================================================
+    function renderBulkMeterTable() {
+      const tbody = document.getElementById('bulk-meter-tbody');
+      const tfoot = document.getElementById('bulk-meter-tfoot');
+      if (!tbody || !tfoot) return;
+
+      const s = state.settings;
+      let rowsHtml = '';
+      let sumRent = 0;
+      let sumWater = 0;
+      let sumElec = 0;
+      let sumArrears = 0;
+      let sumTotal = 0;
+
+      state.rooms.forEach(rm => {
+        if (rm.status !== 'OCCUPIED') return;
+        const wUnits = calcMeterUnits(rm.prevWater, rm.currWater, rm.waterRoll);
+        const eUnits = calcMeterUnits(rm.prevElec, rm.currElec, rm.elecRoll);
+        const wInvalid = wUnits < 0;
+        const eInvalid = eUnits < 0;
+
+        const wSatang = Math.max(0, wUnits) * s.waterRateSatang;
+        const eSatang = Math.max(0, eUnits) * s.electricityRateSatang;
+        const inv = getRoomInvoice(rm.roomNumber);
+        const lateSatang = inv ? calcLateFeeSatang(inv, state.simulatedDate, s) : 0;
+        const arrearsAndLate = (rm.arrearsSatang || 0) + lateSatang;
+        const rowTotal = rm.rentSatang + wSatang + eSatang + arrearsAndLate;
+
+        sumRent += rm.rentSatang;
+        sumWater += wSatang;
+        sumElec += eSatang;
+        sumArrears += arrearsAndLate;
+        sumTotal += rowTotal;
+
+        rowsHtml += `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 px-3 font-extrabold text-slate-900 mono-num">${rm.roomNumber}</td>
+            <td class="py-2.5 px-3">
+              <div class="font-semibold text-slate-800">${rm.tenantName}</div>
+              <div class="text-[11px] text-slate-500">${rm.tier}</div>
+            </td>
+            <td class="py-2.5 px-3 text-right font-semibold mono-num">฿${formatBaht(rm.rentSatang)}</td>
+
+            <!-- Water Meter Input -->
+            <td class="py-2.5 px-3 bg-sky-50/50">
+              <div class="flex items-center justify-center gap-1.5">
+                <span class="text-slate-500 mono-num w-10 text-right">${rm.prevWater}</span>
+                <span class="text-slate-400">→</span>
+                <input type="number" value="${rm.currWater}"
+                  oninput="updateBulkMeterInput('${rm.roomNumber}', 'water', this.value)"
+                  class="w-20 border ${wInvalid ? 'border-rose-500 bg-rose-50' : 'border-sky-300 bg-white'} rounded px-2 py-1 text-right font-bold mono-num" />
+                <label class="flex items-center gap-1 text-[10px] text-slate-600 cursor-pointer" title="ติ๊กกรณีมิเตอร์ 4 หลักวนรอบ 9999 -> 0000">
+                  <input type="checkbox" ${rm.waterRoll ? 'checked' : ''} onchange="toggleMeterRollover('${rm.roomNumber}', 'water', this.checked)" />
+                  <span>วนรอบ</span>
+                </label>
+              </div>
+              <div class="text-center text-[10px] ${wInvalid ? 'text-rose-600 font-bold' : 'text-sky-700'} mt-0.5">
+                ${wInvalid ? '⚠️ เลขใหม่น้อยกว่าเลขเก่า (ติ๊กวนรอบถ้าผ่าน 9999)' : `ใช้ไป ${wUnits} หน่วย`}
+              </div>
+            </td>
+            <td class="py-2.5 px-3 text-right font-semibold text-sky-900 bg-sky-50/50 mono-num">
+              ฿${formatBaht(wSatang)}
+            </td>
+
+            <!-- Electric Meter Input -->
+            <td class="py-2.5 px-3 bg-amber-50/50">
+              <div class="flex items-center justify-center gap-1.5">
+                <span class="text-slate-500 mono-num w-12 text-right">${rm.prevElec}</span>
+                <span class="text-slate-400">→</span>
+                <input type="number" value="${rm.currElec}"
+                  oninput="updateBulkMeterInput('${rm.roomNumber}', 'elec', this.value)"
+                  class="w-20 border ${eInvalid ? 'border-rose-500 bg-rose-50' : 'border-amber-300 bg-white'} rounded px-2 py-1 text-right font-bold mono-num" />
+                <label class="flex items-center gap-1 text-[10px] text-slate-600 cursor-pointer" title="ติ๊กกรณีมิเตอร์ 4 หลักวนรอบ 9999 -> 0000">
+                  <input type="checkbox" ${rm.elecRoll ? 'checked' : ''} onchange="toggleMeterRollover('${rm.roomNumber}', 'elec', this.checked)" />
+                  <span>วนรอบ</span>
+                </label>
+              </div>
+              <div class="text-center text-[10px] ${eInvalid ? 'text-rose-600 font-bold' : 'text-amber-800'} mt-0.5">
+                ${eInvalid ? '⚠️ เลขใหม่น้อยกว่าเลขเก่า (ติ๊กวนรอบถ้าผ่าน 9999)' : `ใช้ไป ${eUnits} หน่วย × ${formatBaht(s.electricityRateSatang)}`}
+              </div>
+            </td>
+            <td class="py-2.5 px-3 text-right font-semibold text-amber-900 bg-amber-50/50 mono-num">
+              ฿${formatBaht(eSatang)}
+            </td>
+
+            <!-- Arrears + Late Fees -->
+            <td class="py-2.5 px-3 text-right mono-num ${arrearsAndLate > 0 ? 'text-rose-600 font-bold' : 'text-slate-400'}">
+              ฿${formatBaht(arrearsAndLate)}
+            </td>
+
+            <!-- Net Total -->
+            <td class="py-2.5 px-3 text-right font-extrabold text-slate-900 mono-num">
+              ฿${formatBaht(rowTotal)}
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rowsHtml;
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="2" class="py-3 px-3">รวมทั้งสิ้น (${state.rooms.filter(r => r.status === 'OCCUPIED').length} ห้องที่มีผู้เช่า)</td>
+          <td class="py-3 px-3 text-right mono-num">฿${formatBaht(sumRent)}</td>
+          <td class="py-3 px-3 text-center text-slate-500">รวมค่าน้ำ</td>
+          <td class="py-3 px-3 text-right text-sky-800 mono-num">฿${formatBaht(sumWater)}</td>
+          <td class="py-3 px-3 text-center text-slate-500">รวมค่าไฟ</td>
+          <td class="py-3 px-3 text-right text-amber-800 mono-num">฿${formatBaht(sumElec)}</td>
+          <td class="py-3 px-3 text-right text-rose-600 mono-num">฿${formatBaht(sumArrears)}</td>
+          <td class="py-3 px-3 text-right text-emerald-700 text-sm mono-num">฿${formatBaht(sumTotal)}</td>
+        </tr>
+      `;
+    }
+
+    function updateBulkMeterInput(roomNumber, kind, val) {
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      const num = parseInt(val, 10) || 0;
+      if (kind === 'water') rm.currWater = num;
+      else rm.currElec = num;
+      renderBulkMeterTable();
+    }
+
+    function toggleMeterRollover(roomNumber, kind, checked) {
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      if (kind === 'water') rm.waterRoll = Boolean(checked);
+      else rm.elecRoll = Boolean(checked);
+      renderBulkMeterTable();
+    }
+
+    function autoFillSampleReadings() {
+      state.rooms.forEach(rm => {
+        if (rm.status !== 'OCCUPIED') return;
+        rm.currWater = rm.prevWater + 7;
+        if (!rm.elecRoll) {
+          rm.currElec = rm.prevElec + 125;
+        }
+      });
+      renderBulkMeterTable();
+      showToast('เติมเลขมิเตอร์ตัวอย่างทั้ง 12 ห้องที่มีผู้เช่าเรียบร้อย');
+    }
+
+    function commitBulkInvoices() {
+      const s = state.settings;
+      for (const rm of state.rooms) {
+        if (rm.status !== 'OCCUPIED') continue;
+        const wUnits = calcMeterUnits(rm.prevWater, rm.currWater, rm.waterRoll);
+        const eUnits = calcMeterUnits(rm.prevElec, rm.currElec, rm.elecRoll);
+        if (wUnits < 0 || eUnits < 0) {
+          showToast(`ไม่สามารถออกบิลได้: ห้อง ${rm.roomNumber} มีเลขมิเตอร์ใหม่น้อยกว่าเลขเก่า`);
+          return;
+        }
+      }
+
+      state.rooms.forEach(rm => {
+        if (rm.status !== 'OCCUPIED') return;
+        const wUnits = calcMeterUnits(rm.prevWater, rm.currWater, rm.waterRoll);
+        const eUnits = calcMeterUnits(rm.prevElec, rm.currElec, rm.elecRoll);
+        const wSatang = wUnits * s.waterRateSatang;
+        const eSatang = eUnits * s.electricityRateSatang;
+
+        let inv = getRoomInvoice(rm.roomNumber);
+        const totalSatang = rm.rentSatang + wSatang + eSatang + (rm.arrearsSatang || 0);
+
+        if (inv) {
+          inv.rentSatang = rm.rentSatang;
+          inv.prevWater = rm.prevWater;
+          inv.currWater = rm.currWater;
+          inv.waterRoll = rm.waterRoll;
+          inv.waterUnits = wUnits;
+          inv.waterSatang = wSatang;
+          inv.prevElec = rm.prevElec;
+          inv.currElec = rm.currElec;
+          inv.elecRoll = rm.elecRoll;
+          inv.elecUnits = eUnits;
+          inv.elecSatang = eSatang;
+          inv.totalSatang = totalSatang;
+          inv.balanceDueSatang = Math.max(0, totalSatang - inv.paidSatang);
+          inv.status = inv.balanceDueSatang === 0 ? 'PAID' : (inv.paidSatang > 0 ? 'PARTIAL' : 'ISSUED');
+        } else {
+          state.invoices.push({
+            id: 'INV-202610-' + rm.roomNumber,
+            roomNumber: rm.roomNumber,
+            tenantName: rm.tenantName,
+            tier: rm.tier,
+            billingPeriod: '2026-10',
+            issueDate: '2026-10-25',
+            dueDate: '2026-11-05',
+            rentSatang: rm.rentSatang,
+            prevWater: rm.prevWater,
+            currWater: rm.currWater,
+            waterRoll: rm.waterRoll,
+            waterUnits: wUnits,
+            waterSatang: wSatang,
+            prevElec: rm.prevElec,
+            currElec: rm.currElec,
+            elecRoll: rm.elecRoll,
+            elecUnits: eUnits,
+            elecSatang: eSatang,
+            arrearsSatang: rm.arrearsSatang || 0,
+            totalSatang: totalSatang,
+            paidSatang: 0,
+            balanceDueSatang: totalSatang,
+            status: 'ISSUED',
+            payments: []
+          });
+        }
+      });
+
+      saveState();
+      switchTab('invoices');
+      showToast('ออกบิลประจำวันที่ 25 พร้อมสร้าง QR PromptPay ทั้งหมดเรียบร้อย!');
+    }
+
+    // =========================================================================
+    // TAB 3 RENDERER: DUAL INVOICE CENTER (LINE QR CARD + A4 SLIP PRINT)
+    // =========================================================================
+    function setInvoiceSubmode(mode) {
+      state.invoiceSubmode = mode;
+      const lineView = document.getElementById('invoice-subview-line');
+      const printView = document.getElementById('invoice-subview-print');
+      const btnLine = document.getElementById('inv-mode-line');
+      const btnPrint = document.getElementById('inv-mode-print');
+
+      if (mode === 'LINE') {
+        lineView.classList.remove('hidden');
+        printView.classList.add('hidden');
+        btnLine.className = 'px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-sm';
+        btnPrint.className = 'px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300';
+      } else {
+        lineView.classList.add('hidden');
+        printView.classList.remove('hidden');
+        btnPrint.className = 'px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-sm';
+        btnLine.className = 'px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300';
+      }
+      renderInvoicesCenter();
+    }
+
+    function selectInvoiceForPreview(invoiceId) {
+      state.selectedInvoiceId = invoiceId;
+      renderInvoicesCenter();
+    }
+
+    function viewRoomLineInvoice(roomNumber) {
+      const inv = getRoomInvoice(roomNumber);
+      if (inv) {
+        state.selectedInvoiceId = inv.id;
+      }
+      state.invoiceSubmode = 'LINE';
+      switchTab('invoices');
+    }
+
+    function renderInvoicesCenter() {
+      const listEl = document.getElementById('line-invoice-selector-list');
+      const cardEl = document.getElementById('line-bill-card-container');
+      const printGrid = document.getElementById('print-slips-grid');
+      if (!listEl || !cardEl || !printGrid) return;
+
+      const activeInvoices = state.invoices.filter(i => i.status !== 'ROLLED_OVER');
+      document.getElementById('line-list-count').textContent = `${activeInvoices.length} ห้อง`;
+
+      if (!activeInvoices.some(i => i.id === state.selectedInvoiceId) && activeInvoices.length > 0) {
+        state.selectedInvoiceId = activeInvoices[0].id;
+      }
+
+      const s = state.settings;
+
+      listEl.innerHTML = activeInvoices.map(inv => {
+        const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, s);
+        const netDue = inv.balanceDueSatang + lateSatang;
+        const selected = inv.id === state.selectedInvoiceId;
+        return `
+          <button type="button" onclick="selectInvoiceForPreview('${inv.id}')"
+            class="w-full text-left px-4 py-3 flex items-center justify-between transition ${selected ? 'bg-emerald-50 border-l-4 border-emerald-600' : 'hover:bg-slate-50'}">
+            <div>
+              <div class="font-bold text-xs text-slate-900">ห้อง ${inv.roomNumber} — ${inv.tenantName}</div>
+              <div class="text-[11px] text-slate-500">แพ็กเกจ ${inv.tier} • ออกบิล ${inv.issueDate}</div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-xs mono-num ${netDue > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                ฿${formatBaht(netDue > 0 ? netDue : inv.totalSatang)}
+              </div>
+              <div class="text-[10px] ${netDue === 0 ? 'text-emerald-600 font-semibold' : 'text-slate-500'}">
+                ${netDue === 0 ? 'ชำระครบแล้ว' : (inv.paidSatang > 0 ? 'แบ่งจ่ายแล้วบางส่วน' : 'รอชำระ')}
+              </div>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      const sel = activeInvoices.find(i => i.id === state.selectedInvoiceId);
+      if (sel) {
+        cardEl.innerHTML = buildSingleInvoiceCardHtml(sel, false);
+      }
+
+      printGrid.innerHTML = activeInvoices.map(inv => buildSingleInvoiceCardHtml(inv, true)).join('');
+    }
+
+    function buildSingleInvoiceCardHtml(inv, isPrintSlip) {
+      const s = state.settings;
+      const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, s);
+      const grandDueSatang = inv.balanceDueSatang + lateSatang;
+      const qrTargetSatang = grandDueSatang > 0 ? grandDueSatang : inv.totalSatang;
+      const qrSvg = generatePromptPayQrSvg(s.promptPayId, qrTargetSatang);
+
+      return `
+        <div class="${isPrintSlip ? 'print-slip-card bg-white rounded-xl p-4 border border-slate-300' : 'p-5'} space-y-3 text-xs">
+          <div class="flex items-start justify-between border-b border-slate-200 pb-2.5">
+            <div>
+              <div class="text-sm font-extrabold text-slate-900">${s.apartmentName} (ใบแจ้งหนี้/ใบเสร็จ)</div>
+              <div class="text-[11px] text-slate-500">เลขที่บิล: ${inv.id} • วันตัดรอบ: ${inv.issueDate}</div>
+              <div class="text-[11px] text-rose-600 font-semibold">กำหนดชำระภายใน: วันที่ 5 พ.ย. 2026</div>
+            </div>
+            <div class="text-right">
+              <span class="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-extrabold text-sm mono-num">ห้อง ${inv.roomNumber}</span>
+              <div class="text-[11px] text-slate-600 mt-1 font-medium">${inv.tenantName}</div>
+            </div>
+          </div>
+
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500 text-[11px]">
+                <th class="py-1 text-left">รายการ</th>
+                <th class="py-1 text-right">รายละเอียด</th>
+                <th class="py-1 text-right">จำนวนเงิน (บาท)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr>
+                <td class="py-1.5 font-medium">1. ค่าเช่าห้องพัก (${inv.tier})</td>
+                <td class="py-1.5 text-right text-slate-500">1 เดือน</td>
+                <td class="py-1.5 text-right font-semibold mono-num">${formatBaht(inv.rentSatang)}</td>
+              </tr>
+              <tr>
+                <td class="py-1.5 font-medium">2. ค่าน้ำประปา</td>
+                <td class="py-1.5 text-right text-slate-500 mono-num">${inv.prevWater} → ${inv.currWater} (${inv.waterUnits} หน่วย × ${formatBaht(s.waterRateSatang)})</td>
+                <td class="py-1.5 text-right font-semibold mono-num">${formatBaht(inv.waterSatang)}</td>
+              </tr>
+              <tr>
+                <td class="py-1.5 font-medium">3. ค่าไฟฟ้า</td>
+                <td class="py-1.5 text-right text-slate-500 mono-num">${inv.prevElec} → ${inv.currElec} (${inv.elecUnits} หน่วย × ${formatBaht(s.electricityRateSatang)})</td>
+                <td class="py-1.5 text-right font-semibold mono-num">${formatBaht(inv.elecSatang)}</td>
+              </tr>
+              ${inv.arrearsSatang > 0 ? `
+                <tr class="text-rose-700 bg-rose-50/60">
+                  <td class="py-1.5 font-semibold">4. ยอดค้างชำระยกมาจากเดือนก่อน</td>
+                  <td class="py-1.5 text-right">ทบยอดอัตโนมัติ</td>
+                  <td class="py-1.5 text-right font-bold mono-num">${formatBaht(inv.arrearsSatang)}</td>
+                </tr>
+              ` : ''}
+              ${lateSatang > 0 ? `
+                <tr class="text-rose-700 bg-rose-50/60">
+                  <td class="py-1.5 font-semibold">5. ค่าปรับเกินกำหนดวันที่ 5</td>
+                  <td class="py-1.5 text-right">วันละ ฿${formatBaht(s.dailyLateFeeSatang)}</td>
+                  <td class="py-1.5 text-right font-bold mono-num">${formatBaht(lateSatang)}</td>
+                </tr>
+              ` : ''}
+              ${inv.paidSatang > 0 ? `
+                <tr class="text-emerald-700">
+                  <td class="py-1.5 font-semibold">หัก: ชำระแล้วบางส่วน</td>
+                  <td class="py-1.5 text-right">รับเงินแล้ว</td>
+                  <td class="py-1.5 text-right font-bold mono-num">-${formatBaht(inv.paidSatang)}</td>
+                </tr>
+              ` : ''}
+            </tbody>
+          </table>
+
+          <div class="bg-slate-900 text-white rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-[11px] text-slate-300">ยอดสุทธิที่ต้องชำระ (Net Due)</div>
+              <div class="text-[10px] text-emerald-300">ไม่มีค่าบริการส่วนกลาง • คิดตามหน่วยจริง</div>
+            </div>
+            <div class="text-lg font-extrabold mono-num text-emerald-400">
+              ฿${formatBaht(grandDueSatang)}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 pt-1 bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-200">
+            <div class="shrink-0">
+              ${qrSvg}
+            </div>
+            <div class="space-y-1 text-[11px] text-slate-700">
+              <div class="inline-flex items-center gap-1.5 bg-[#00a950] text-white px-2 py-1 rounded-md font-bold text-[10px]">
+                <span>🏦 ธนาคารกสิกรไทย (KBank)</span>
+              </div>
+              <div>เลขที่บัญชี: <strong class="mono-num text-sm font-black text-[#008f43]">696-2-08678-9</strong></div>
+              <div>ชื่อบัญชี: <strong class="text-slate-900 font-bold">นายรามจิตติ ปสุตนาวิน</strong></div>
+              <div>พร้อมเพย์: <strong class="mono-num text-slate-800">${s.promptPayId}</strong> • ยอดโอน: <strong class="mono-num text-emerald-700">฿${formatBaht(qrTargetSatang)}</strong></div>
+              <div class="text-[10px] text-slate-500">ติดต่อหอพัก: โทร. 092-825-5788 • เมื่อโอนแล้วกรุณาส่งสลิปทาง LINE</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function copyLineInvoiceText() {
+      const inv = state.invoices.find(i => i.id === state.selectedInvoiceId);
+      if (!inv) return;
+      const s = state.settings;
+      const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, s);
+      const netDue = inv.balanceDueSatang + lateSatang;
+      const text = [
+        `🏢 แจ้งค่าเช่า ${s.apartmentName} — ห้อง ${inv.roomNumber}`,
+        `ผู้เช่า: ${inv.tenantName} (แพ็กเกจ ${inv.tier})`,
+        `ประจำรอบตัดบิล: ${inv.issueDate} (กำหนดชำระภายใน 5 พ.ย.)`,
+        `• ค่าห้องพัก: ${formatBaht(inv.rentSatang)} บาท`,
+        `• ค่าน้ำ (${inv.prevWater}→${inv.currWater} = ${inv.waterUnits} หน่วย): ${formatBaht(inv.waterSatang)} บาท`,
+        `• ค่าไฟ (${inv.prevElec}→${inv.currElec} = ${inv.elecUnits} หน่วย): ${formatBaht(inv.elecSatang)} บาท`,
+        inv.arrearsSatang > 0 ? `• ยอดค้างยกมา: ${formatBaht(inv.arrearsSatang)} บาท` : '',
+        lateSatang > 0 ? `• ค่าปรับเกินกำหนด: ${formatBaht(lateSatang)} บาท` : '',
+        inv.paidSatang > 0 ? `• ชำระแล้วบางส่วน: -${formatBaht(inv.paidSatang)} บาท` : '',
+        `✅ ยอดสุทธิที่ต้องโอน: ${formatBaht(netDue)} บาท`,
+        `📲 โอนผ่าน PromptPay: ${s.promptPayId}`
+      ].filter(Boolean).join('\n');
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text);
+        }
+      } catch (e) {
+        // Fallback handled silently
+      }
+      showToast(`คัดลอกข้อความแจ้งหนี้ห้อง ${inv.roomNumber} สำหรับวางใน LINE แล้ว!`);
+    }
+
+    function triggerPrintSlips() {
+      window.print();
+    }
+
+    // =========================================================================
+    // TAB 4 RENDERER: PAYMENTS, PARTIAL PAYMENTS & MOVE-OUT SETTLEMENTS
+    // =========================================================================
+    function setPaymentFilter(filter) {
+      state.paymentFilter = filter;
+      ['UNPAID', 'PAID', 'ALL'].forEach(f => {
+        const btn = document.getElementById('pay-filter-' + f);
+        if (!btn) return;
+        if (f === filter) {
+          btn.className = 'pay-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white';
+        } else {
+          btn.className = 'pay-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700';
+        }
+      });
+      renderPaymentsView();
+    }
+
+    function renderPaymentsView() {
+      const tbody = document.getElementById('payments-table-tbody');
+      const settleList = document.getElementById('settlements-history-list');
+      if (!tbody || !settleList) return;
+
+      const s = state.settings;
+      const filtered = state.invoices.filter(inv => {
+        if (inv.status === 'ROLLED_OVER') return false;
+        if (state.paymentFilter === 'UNPAID') return inv.balanceDueSatang > 0;
+        if (state.paymentFilter === 'PAID') return inv.balanceDueSatang === 0;
+        return true;
+      });
+
+      tbody.innerHTML = filtered.map(inv => {
+        const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, s);
+        const totalWithLate = inv.totalSatang + lateSatang;
+        const remainingWithLate = inv.balanceDueSatang + lateSatang;
+
+        let badge = '';
+        if (inv.balanceDueSatang === 0) {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">ชำระครบแล้ว</span>`;
+        } else if (inv.paidSatang > 0) {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">แบ่งจ่ายแล้ว (${inv.payments.length} งวด)</span>`;
+        } else if (lateSatang > 0) {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">ค้างชำระเกินวันที่ 5</span>`;
+        } else {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">รอชำระเงิน</span>`;
+        }
+
+        const slipSummary = inv.payments.length > 0
+          ? `<div class="text-[10px] text-emerald-700 mt-0.5">📎 ${inv.payments[inv.payments.length - 1].slipNote}</div>`
+          : '';
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-3 font-semibold mono-num">${inv.id}</td>
+            <td class="py-3 px-3">
+              <div class="font-bold text-slate-900">ห้อง ${inv.roomNumber} — ${inv.tenantName}</div>
+              <div class="text-[11px] text-slate-500">กำหนดชำระ ${inv.dueDate}</div>
+            </td>
+            <td class="py-3 px-3 text-right mono-num">฿${formatBaht(inv.totalSatang)}</td>
+            <td class="py-3 px-3 text-right mono-num ${lateSatang > 0 ? 'text-rose-600 font-bold' : 'text-slate-400'}">
+              ฿${formatBaht(lateSatang)}
+            </td>
+            <td class="py-3 px-3 text-right font-bold mono-num">฿${formatBaht(totalWithLate)}</td>
+            <td class="py-3 px-3 text-right text-emerald-700 font-semibold mono-num">฿${formatBaht(inv.paidSatang)}</td>
+            <td class="py-3 px-3 text-right font-extrabold mono-num ${remainingWithLate > 0 ? 'text-rose-600' : 'text-slate-400'}">
+              ฿${formatBaht(remainingWithLate)}
+            </td>
+            <td class="py-3 px-3 text-center">
+              ${badge}
+              ${slipSummary}
+            </td>
+            <td class="py-3 px-3 text-right">
+              ${remainingWithLate > 0 ? `
+                <button type="button" onclick="openPaymentModalById('${inv.id}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700">
+                  💰 รับเงิน / แบ่งจ่าย
+                </button>
+              ` : `
+                <button type="button" onclick="viewRoomLineInvoice('${inv.roomNumber}')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">
+                  ดูใบเสร็จ
+                </button>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      settleList.innerHTML = state.settlements.map(st => `
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div>
+            <span class="font-bold text-slate-900">ห้อง ${st.roomNumber} — ${st.tenantName}</span>
+            <span class="text-slate-500 ml-2">วันย้ายออก: ${st.moveOutDate}</span>
+            <div class="text-[11px] text-slate-600 mt-0.5">
+              เงินประกันที่ถือไว้ ฿${formatBaht(st.depositHeldSatang)} หัก (น้ำ ฿${formatBaht(st.finalWaterSatang)} + ไฟ ฿${formatBaht(st.finalElectricSatang)} + ทำความสะอาด/เสียหาย ฿${formatBaht(st.cleaningFeeSatang + st.damageFeeSatang)} + ค้างชำระ ฿${formatBaht(st.arrearsSatang)})
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-[11px] text-slate-500">เงินประกันคืนสุทธิ</div>
+            <div class="text-sm font-extrabold mono-num ${st.netRefundSatang >= 0 ? 'text-emerald-700' : 'text-rose-600'}">
+              ฿${formatBaht(st.netRefundSatang)}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // TAB 5 RENDERER: SETTINGS, EXPENSES & P&L
+    // =========================================================================
+    function renderSettingsAndExpenses() {
+      const s = state.settings;
+      document.getElementById('set-elec-rate').value = fromSatang(s.electricityRateSatang);
+      document.getElementById('set-water-rate').value = fromSatang(s.waterRateSatang);
+      document.getElementById('set-tier-std').value = fromSatang(s.tierStandardSatang);
+      document.getElementById('set-tier-silver').value = fromSatang(s.tierSilverSatang);
+      document.getElementById('set-tier-gold').value = fromSatang(s.tierGoldSatang);
+      document.getElementById('set-billing-day').value = s.billingDay;
+      document.getElementById('set-due-day').value = s.dueDayNextMonth;
+      document.getElementById('set-late-fee').value = fromSatang(s.dailyLateFeeSatang);
+      document.getElementById('set-promptpay').value = s.promptPayId;
+      document.getElementById('set-deposit-mult').value = String(s.defaultDepositMonths);
+
+      const expContainer = document.getElementById('expense-list-container');
+      expContainer.innerHTML = state.expenses.map(ex => `
+        <div class="py-2.5 px-2 flex items-center justify-between">
+          <div>
+            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium mr-1.5">${ex.category}</span>
+            <span class="font-semibold text-slate-800">${ex.title}</span>
+            <span class="text-slate-400 ml-1.5 mono-num">(${ex.date})</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-rose-600 mono-num">-฿${formatBaht(ex.amountSatang)}</span>
+            <button type="button" onclick="deleteExpenseItem('${ex.id}')" class="text-slate-400 hover:text-rose-600 font-bold">✕</button>
+          </div>
+        </div>
+      `).join('');
+
+      const totalCollected = state.invoices.reduce((acc, i) => acc + (i.paidSatang || 0), 0);
+      const totalExpenses = state.expenses.reduce((acc, e) => acc + e.amountSatang, 0);
+      const netProfit = totalCollected - totalExpenses;
+
+      document.getElementById('pnl-summary-box').innerHTML = `
+        <div class="flex justify-between text-slate-300">
+          <span>รายรับจริงที่เก็บได้แล้วในรอบเดือนนี้:</span>
+          <span class="font-bold text-emerald-400 mono-num">+฿${formatBaht(totalCollected)}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>หัก รายจ่ายดำเนินงานและซ่อมบำรุงหอพัก:</span>
+          <span class="font-bold text-rose-400 mono-num">-฿${formatBaht(totalExpenses)}</span>
+        </div>
+        <div class="border-t border-slate-700 pt-2 flex justify-between items-baseline">
+          <span class="font-bold text-sm">กำไรสุทธิเข้ากระเป๋า (Net Operating Income):</span>
+          <span class="font-extrabold text-lg text-emerald-300 mono-num">฿${formatBaht(netProfit)}</span>
+        </div>
+      `;
+    }
+
+    function saveSettingsForm(e) {
+      e.preventDefault();
+      const s = state.settings;
+      s.electricityRateSatang = toSatang(document.getElementById('set-elec-rate').value);
+      s.waterRateSatang = toSatang(document.getElementById('set-water-rate').value);
+      s.tierStandardSatang = toSatang(document.getElementById('set-tier-std').value);
+      s.tierSilverSatang = toSatang(document.getElementById('set-tier-silver').value);
+      s.tierGoldSatang = toSatang(document.getElementById('set-tier-gold').value);
+      s.billingDay = parseInt(document.getElementById('set-billing-day').value, 10) || 25;
+      s.dueDayNextMonth = parseInt(document.getElementById('set-due-day').value, 10) || 5;
+      s.dailyLateFeeSatang = toSatang(document.getElementById('set-late-fee').value);
+      s.promptPayId = document.getElementById('set-promptpay').value.trim();
+      s.defaultDepositMonths = parseInt(document.getElementById('set-deposit-mult').value, 10) || 1;
+
+      saveState();
+      renderAll();
+      showToast('บันทึกการตั้งค่าเรทหอพักเรียบร้อยแล้ว');
+    }
+
+    function handleAddExpense(e) {
+      e.preventDefault();
+      const title = document.getElementById('exp-title').value.trim();
+      const category = document.getElementById('exp-category').value;
+      const amountBaht = parseFloat(document.getElementById('exp-amount').value) || 0;
+      if (!title || amountBaht <= 0) return;
+
+      state.expenses.unshift({
+        id: 'EXP-' + Date.now(),
+        date: state.simulatedDate,
+        category: category,
+        title: title,
+        amountSatang: toSatang(amountBaht)
+      });
+      document.getElementById('exp-title').value = '';
+      document.getElementById('exp-amount').value = '';
+      saveState();
+      renderAll();
+      showToast('บันทึกรายจ่ายหอพักเรียบร้อย');
+    }
+
+    function deleteExpenseItem(id) {
+      state.expenses = state.expenses.filter(ex => ex.id !== id);
+      saveState();
+      renderAll();
+      showToast('ลบรายการรายจ่ายแล้ว');
+    }
+
+    function exportDatabaseBackup() {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute('href', dataStr);
+      a.setAttribute('download', `taky_erp_backup_${state.simulatedDate}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('ดาวน์โหลดไฟล์สำรองฐานข้อมูล (.json) เรียบร้อย');
+    }
+
+    function resetDemoDatabase() {
+      state = createInitialState();
+      saveState();
+      renderAll();
+      showToast('รีเซ็ตข้อมูลตัวอย่าง 15 ห้องกลับเป็นค่าเริ่มต้นแล้ว');
+    }
+
+    // =========================================================================
+    // MODAL HANDLERS (MOVE-IN, RESERVATION, PAYMENT, MOVE-OUT)
+    // =========================================================================
+    function closeModal(modalId) {
+      const m = document.getElementById(modalId);
+      if (m) {
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+      }
+    }
+
+    function openModal(modalId) {
+      const m = document.getElementById(modalId);
+      if (m) {
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+      }
+    }
+
+    // 1. Move-In Modal (with Proration to 25th & Deposit Multiplier)
+    function openMoveInModal(roomNumber) {
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      document.getElementById('mi-room-number').value = roomNumber;
+      document.getElementById('movein-modal-title').textContent = `ทำสัญญาเข้าอยู่ใหม่ — ห้อง ${roomNumber}`;
+      document.getElementById('mi-tenant-name').value = rm.status === 'RESERVED' ? rm.tenantName.replace(' (จองแล้ว)', '') : '';
+      document.getElementById('mi-tenant-phone').value = rm.status === 'RESERVED' ? rm.phone : '';
+      document.getElementById('mi-tier').value = rm.tier || 'GOLD';
+      document.getElementById('mi-deposit-mult').value = String(state.settings.defaultDepositMonths);
+      document.getElementById('mi-booking-credit').value = rm.status === 'RESERVED' ? fromSatang(rm.bookingDepositSatang || 0) : 0;
+      document.getElementById('mi-init-water').value = rm.currWater;
+      document.getElementById('mi-init-elec').value = rm.currElec;
+
+      const s = state.settings;
+      const tier = document.getElementById('mi-tier').value;
+      const rentBaht = tier === 'STANDARD' ? fromSatang(s.tierStandardSatang) : tier === 'SILVER' ? fromSatang(s.tierSilverSatang) : fromSatang(s.tierGoldSatang);
+      document.getElementById('mi-monthly-rent').value = rentBaht;
+
+      recalcMoveInPreview();
+      openModal('modal-movein');
+    }
+
+    function recalcMoveInPreview() {
+      const s = state.settings;
+      const tier = document.getElementById('mi-tier').value;
+      const rentInput = document.getElementById('mi-monthly-rent');
+      if (tier === 'STANDARD') rentInput.value = fromSatang(s.tierStandardSatang);
+      else if (tier === 'SILVER') rentInput.value = fromSatang(s.tierSilverSatang);
+      else if (tier === 'GOLD') rentInput.value = fromSatang(s.tierGoldSatang);
+
+      const monthlyRentSatang = toSatang(rentInput.value);
+      const mult = parseInt(document.getElementById('mi-deposit-mult').value, 10) || 1;
+      const depositSatang = monthlyRentSatang * mult;
+      const bookingCreditSatang = toSatang(document.getElementById('mi-booking-credit').value);
+      const startDateStr = document.getElementById('mi-start-date').value;
+      const useProrate = document.getElementById('mi-prorate-toggle').checked;
+
+      const pro = calcProratedRentSatang(monthlyRentSatang, startDateStr, s.billingDay);
+      const firstRentSatang = useProrate ? pro.proratedAmountSatang : monthlyRentSatang;
+      const netMoveInSatang = Math.max(0, firstRentSatang + depositSatang - bookingCreditSatang);
+
+      document.getElementById('mi-calculation-preview').innerHTML = `
+        <div class="flex justify-between text-slate-300">
+          <span>${useProrate ? `ค่าเช่าเฉลี่ยถึงวันที่ ${s.billingDay} (${pro.proratedDays} วัน × ฿${formatBaht(pro.dailyRateSatang)}/วัน):` : 'ค่าเช่าเดือนแรกเต็มเดือน:'}</span>
+          <span class="font-bold mono-num">฿${formatBaht(firstRentSatang)}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>บวก เงินประกันห้อง (${mult} เท่าของค่าห้อง):</span>
+          <span class="font-bold mono-num">+฿${formatBaht(depositSatang)}</span>
+        </div>
+        ${bookingCreditSatang > 0 ? `
+          <div class="flex justify-between text-emerald-300">
+            <span>หัก เงินมัดจำจองห้องที่รับไว้แล้ว:</span>
+            <span class="font-bold mono-num">-฿${formatBaht(bookingCreditSatang)}</span>
+          </div>
+        ` : ''}
+        <div class="border-t border-slate-700 pt-1.5 flex justify-between items-baseline">
+          <span class="font-bold">ยอดชำระวันทำสัญญาเข้าอยู่สุทธิ:</span>
+          <span class="text-base font-extrabold text-emerald-400 mono-num">฿${formatBaht(netMoveInSatang)}</span>
+        </div>
+      `;
+    }
+
+    function submitMoveInForm(e) {
+      e.preventDefault();
+      const roomNumber = document.getElementById('mi-room-number').value;
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+
+      const monthlyRentSatang = toSatang(document.getElementById('mi-monthly-rent').value);
+      const mult = parseInt(document.getElementById('mi-deposit-mult').value, 10) || 1;
+      const initWater = parseInt(document.getElementById('mi-init-water').value, 10) || 0;
+      const initElec = parseInt(document.getElementById('mi-init-elec').value, 10) || 0;
+
+      rm.status = 'OCCUPIED';
+      rm.tier = document.getElementById('mi-tier').value;
+      rm.rentSatang = monthlyRentSatang;
+      rm.depositSatang = monthlyRentSatang * mult;
+      rm.tenantName = document.getElementById('mi-tenant-name').value.trim();
+      rm.phone = document.getElementById('mi-tenant-phone').value.trim();
+      rm.startDate = document.getElementById('mi-start-date').value;
+      rm.bookingDepositSatang = 0;
+      rm.prevWater = initWater;
+      rm.currWater = initWater;
+      rm.prevElec = initElec;
+      rm.currElec = initElec;
+      rm.arrearsSatang = 0;
+
+      saveState();
+      closeModal('modal-movein');
+      renderAll();
+      showToast(`ทำสัญญาเข้าอยู่ห้อง ${roomNumber} (${rm.tenantName}) เรียบร้อย!`);
+    }
+
+    // 2. Reservation Modal
+    function openReserveModal(roomNumber) {
+      document.getElementById('res-room-number').value = roomNumber;
+      document.getElementById('reserve-modal-title').textContent = `รับจองห้องพักล่วงหน้า — ห้อง ${roomNumber}`;
+      document.getElementById('res-name').value = '';
+      document.getElementById('res-phone').value = '';
+      openModal('modal-reserve');
+    }
+
+    function submitReservationForm(e) {
+      e.preventDefault();
+      const roomNumber = document.getElementById('res-room-number').value;
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+
+      const tier = document.getElementById('res-tier').value;
+      const s = state.settings;
+      rm.status = 'RESERVED';
+      rm.tier = tier;
+      rm.rentSatang = tier === 'STANDARD' ? s.tierStandardSatang : tier === 'SILVER' ? s.tierSilverSatang : s.tierGoldSatang;
+      rm.tenantName = document.getElementById('res-name').value.trim() + ' (จองแล้ว)';
+      rm.phone = document.getElementById('res-phone').value.trim();
+      rm.startDate = document.getElementById('res-date').value;
+      rm.bookingDepositSatang = toSatang(document.getElementById('res-deposit').value);
+
+      saveState();
+      closeModal('modal-reserve');
+      renderAll();
+      showToast(`บันทึกการจองห้อง ${roomNumber} พร้อมรับเงินจองเรียบร้อย`);
+    }
+
+    function cancelReservation(roomNumber) {
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      rm.status = 'AVAILABLE';
+      rm.tenantName = '';
+      rm.phone = '';
+      rm.bookingDepositSatang = 0;
+      saveState();
+      renderAll();
+      showToast(`ยกเลิกการจองห้อง ${roomNumber} และเปิดเป็นห้องว่างแล้ว`);
+    }
+
+    function markMaintenanceDone(roomNumber) {
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      rm.status = 'AVAILABLE';
+      rm.tenantName = '';
+      rm.phone = '';
+      saveState();
+      renderAll();
+      showToast(`ห้อง ${roomNumber} ซ่อมเสร็จและเปิดเป็นห้องว่างพร้อมเช่าแล้ว`);
+    }
+
+    // 3. Payment & Partial Payment Modal
+    function openPaymentModalById(invoiceId) {
+      const inv = state.invoices.find(i => i.id === invoiceId);
+      if (!inv) return;
+      const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, state.settings);
+      const totalRemainingSatang = inv.balanceDueSatang + lateSatang;
+
+      document.getElementById('pay-invoice-id').value = inv.id;
+      document.getElementById('pay-modal-title').textContent = `รับชำระเงิน — ห้อง ${inv.roomNumber} (${inv.tenantName})`;
+      document.getElementById('pay-modal-summary').innerHTML = `
+        <div class="flex justify-between">
+          <span class="text-slate-500">ยอดบิลตั้งต้น:</span>
+          <span class="font-semibold mono-num">฿${formatBaht(inv.totalSatang)}</span>
+        </div>
+        ${lateSatang > 0 ? `
+          <div class="flex justify-between text-rose-600">
+            <span>บวก ค่าปรับเกินกำหนดวันที่ 5:</span>
+            <span class="font-bold mono-num">+฿${formatBaht(lateSatang)}</span>
+          </div>
+        ` : ''}
+        <div class="flex justify-between text-emerald-700">
+          <span>ชำระแล้ว:</span>
+          <span class="font-semibold mono-num">-฿${formatBaht(inv.paidSatang)}</span>
+        </div>
+        <div class="border-t border-slate-200 pt-1 flex justify-between font-bold text-slate-900">
+          <span>ยอดคงเหลือค้างชำระสุทธิ:</span>
+          <span class="text-rose-600 mono-num">฿${formatBaht(totalRemainingSatang)}</span>
+        </div>
+      `;
+      document.getElementById('pay-amount-input').value = fromSatang(totalRemainingSatang);
+      openModal('modal-payment');
+    }
+
+    function openPaymentModalForRoom(roomNumber) {
+      const inv = getRoomInvoice(roomNumber);
+      if (!inv) {
+        showToast('ห้องนี้ยังไม่มีบิลค้างชำระ');
+        return;
+      }
+      openPaymentModalById(inv.id);
+    }
+
+    function openPaymentModalForSelectedInvoice() {
+      if (state.selectedInvoiceId) {
+        openPaymentModalById(state.selectedInvoiceId);
+      }
+    }
+
+    function setPaymentAmountPreset(mode) {
+      const invId = document.getElementById('pay-invoice-id').value;
+      const inv = state.invoices.find(i => i.id === invId);
+      if (!inv) return;
+      const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, state.settings);
+      const totalRemainingSatang = inv.balanceDueSatang + lateSatang;
+      if (mode === 'FULL') {
+        document.getElementById('pay-amount-input').value = fromSatang(totalRemainingSatang);
+      } else {
+        document.getElementById('pay-amount-input').value = fromSatang(Math.round(totalRemainingSatang / 2));
+      }
+    }
+
+    function submitPaymentForm(e) {
+      e.preventDefault();
+      const invId = document.getElementById('pay-invoice-id').value;
+      const inv = state.invoices.find(i => i.id === invId);
+      if (!inv) return;
+
+      const paySatang = toSatang(document.getElementById('pay-amount-input').value);
+      const method = document.getElementById('pay-method-input').value;
+      const slipNote = document.getElementById('pay-slip-note').value.trim() || 'แนบสลิปแล้ว';
+      const lateSatang = calcLateFeeSatang(inv, state.simulatedDate, state.settings);
+
+      if (lateSatang > 0) {
+        inv.totalSatang += lateSatang;
+        inv.balanceDueSatang += lateSatang;
+      }
+
+      inv.paidSatang += paySatang;
+      inv.balanceDueSatang = Math.max(0, inv.totalSatang - inv.paidSatang);
+      inv.status = inv.balanceDueSatang === 0 ? 'PAID' : 'PARTIAL';
+      inv.payments.push({
+        paidAt: state.simulatedDate + ' 14:30',
+        amountSatang: paySatang,
+        method: method,
+        slipNote: slipNote
+      });
+
+      const rm = state.rooms.find(r => r.roomNumber === inv.roomNumber);
+      if (rm && inv.balanceDueSatang === 0) {
+        rm.arrearsSatang = 0;
+      }
+
+      saveState();
+      closeModal('modal-payment');
+      renderAll();
+      showToast(`บันทึกรับเงินห้อง ${inv.roomNumber} จำนวน ฿${formatBaht(paySatang)} เรียบร้อย!`);
+    }
+
+    // 4. Move-Out & Security Deposit Settlement Modal
+    function openMoveOutModal(roomNumber) {
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      document.getElementById('mo-room-number').value = roomNumber;
+      document.getElementById('moveout-modal-title').textContent = `แจ้งย้ายออก & คืนเงินประกัน — ห้อง ${roomNumber} (${rm.tenantName})`;
+      document.getElementById('mo-prev-water').value = rm.currWater;
+      document.getElementById('mo-curr-water').value = rm.currWater + 3;
+      document.getElementById('mo-prev-elec').value = rm.currElec;
+      document.getElementById('mo-curr-elec').value = rm.currElec + 40;
+      document.getElementById('mo-cleaning-fee').value = 300;
+      document.getElementById('mo-damage-fee').value = 0;
+      recalcMoveOutPreview();
+      openModal('modal-moveout');
+    }
+
+    function recalcMoveOutPreview() {
+      const roomNumber = document.getElementById('mo-room-number').value;
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      const s = state.settings;
+
+      const prevW = parseInt(document.getElementById('mo-prev-water').value, 10) || 0;
+      const currW = parseInt(document.getElementById('mo-curr-water').value, 10) || 0;
+      const prevE = parseInt(document.getElementById('mo-prev-elec').value, 10) || 0;
+      const currE = parseInt(document.getElementById('mo-curr-elec').value, 10) || 0;
+
+      const wUnits = Math.max(0, currW - prevW);
+      const eUnits = Math.max(0, currE - prevE);
+      const finalWaterSatang = wUnits * s.waterRateSatang;
+      const finalElecSatang = eUnits * s.electricityRateSatang;
+      const cleaningSatang = toSatang(document.getElementById('mo-cleaning-fee').value);
+      const damageSatang = toSatang(document.getElementById('mo-damage-fee').value);
+
+      const inv = getRoomInvoice(roomNumber);
+      const unpaidArrearsSatang = inv ? inv.balanceDueSatang : 0;
+      const depositHeldSatang = rm.depositSatang || s.tierGoldSatang;
+      const totalDeductions = finalWaterSatang + finalElecSatang + cleaningSatang + damageSatang + unpaidArrearsSatang;
+      const netRefundSatang = depositHeldSatang - totalDeductions;
+
+      document.getElementById('mo-settlement-preview').innerHTML = `
+        <div class="flex justify-between text-slate-300">
+          <span>เงินประกันห้องที่ถือไว้:</span>
+          <span class="font-bold text-emerald-400 mono-num">฿${formatBaht(depositHeldSatang)}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>หัก ค่าน้ำวันย้ายออก (${wUnits} หน่วย):</span>
+          <span class="mono-num">-฿${formatBaht(finalWaterSatang)}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>หัก ค่าไฟวันย้ายออก (${eUnits} หน่วย × ฿${formatBaht(s.electricityRateSatang)}):</span>
+          <span class="mono-num">-฿${formatBaht(finalElecSatang)}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>หัก ค่าทำความสะอาด + ค่าเสียหาย:</span>
+          <span class="mono-num">-฿${formatBaht(cleaningSatang + damageSatang)}</span>
+        </div>
+        ${unpaidArrearsSatang > 0 ? `
+          <div class="flex justify-between text-rose-300">
+            <span>หัก ยอดบิลค้างชำระ:</span>
+            <span class="mono-num">-฿${formatBaht(unpaidArrearsSatang)}</span>
+          </div>
+        ` : ''}
+        <div class="border-t border-slate-700 pt-1.5 flex justify-between items-baseline">
+          <span class="font-bold">${netRefundSatang >= 0 ? 'ยอดเงินประกันคืนผู้เช่าสุทธิ:' : 'ยอดที่ผู้เช่าต้องชำระเพิ่ม:'}</span>
+          <span class="text-base font-extrabold mono-num ${netRefundSatang >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+            ฿${formatBaht(Math.abs(netRefundSatang))}
+          </span>
+        </div>
+      `;
+    }
+
+    function submitMoveOutForm(e) {
+      e.preventDefault();
+      const roomNumber = document.getElementById('mo-room-number').value;
+      const rm = state.rooms.find(r => r.roomNumber === roomNumber);
+      if (!rm) return;
+      const s = state.settings;
+
+      const prevW = parseInt(document.getElementById('mo-prev-water').value, 10) || 0;
+      const currW = parseInt(document.getElementById('mo-curr-water').value, 10) || 0;
+      const prevE = parseInt(document.getElementById('mo-prev-elec').value, 10) || 0;
+      const currE = parseInt(document.getElementById('mo-curr-elec').value, 10) || 0;
+      const finalWaterSatang = Math.max(0, currW - prevW) * s.waterRateSatang;
+      const finalElecSatang = Math.max(0, currE - prevE) * s.electricityRateSatang;
+      const cleaningSatang = toSatang(document.getElementById('mo-cleaning-fee').value);
+      const damageSatang = toSatang(document.getElementById('mo-damage-fee').value);
+
+      const inv = getRoomInvoice(roomNumber);
+      const unpaidArrearsSatang = inv ? inv.balanceDueSatang : 0;
+      const depositHeldSatang = rm.depositSatang || s.tierGoldSatang;
+      const netRefundSatang = depositHeldSatang - (finalWaterSatang + finalElecSatang + cleaningSatang + damageSatang + unpaidArrearsSatang);
+
+      state.settlements.unshift({
+        id: 'SET-' + Date.now(),
+        roomNumber: roomNumber,
+        tenantName: rm.tenantName,
+        moveOutDate: state.simulatedDate,
+        depositHeldSatang: depositHeldSatang,
+        finalWaterSatang: finalWaterSatang,
+        finalElectricSatang: finalElecSatang,
+        cleaningFeeSatang: cleaningSatang,
+        damageFeeSatang: damageSatang,
+        arrearsSatang: unpaidArrearsSatang,
+        netRefundSatang: netRefundSatang
+      });
+
+      if (inv) {
+        inv.status = 'PAID';
+        inv.balanceDueSatang = 0;
+      }
+
+      rm.status = 'AVAILABLE';
+      rm.tenantName = '';
+      rm.phone = '';
+      rm.depositSatang = 0;
+      rm.prevWater = currW;
+      rm.currWater = currW;
+      rm.prevElec = currE;
+      rm.currElec = currE;
+      rm.arrearsSatang = 0;
+
+      saveState();
+      closeModal('modal-moveout');
+      renderAll();
+      showToast(`บันทึกย้ายออกห้อง ${roomNumber} และคืนเงินประกันสุทธิ ฿${formatBaht(netRefundSatang)} เรียบร้อย`);
+    }
+
+
+    // 5. 15-Room Go-Live Initial Setup Grid
+    function openGoLiveSetupModal() {
+      renderGoLiveSetupRows();
+      openModal('modal-golive');
+    }
+
+    function renderGoLiveSetupRows() {
+      const tbody = document.getElementById('golive-setup-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = state.rooms.map((rm, idx) => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2 px-2.5 font-extrabold mono-num text-slate-900">ห้อง ${rm.roomNumber}</td>
+          <td class="py-2 px-2.5">
+            <select id="gl-status-${rm.roomNumber}" class="border border-slate-300 rounded px-2 py-1 text-xs font-semibold">
+              <option value="OCCUPIED" ${rm.status === 'OCCUPIED' ? 'selected' : ''}>มีผู้เช่า (OCCUPIED)</option>
+              <option value="AVAILABLE" ${rm.status === 'AVAILABLE' ? 'selected' : ''}>ห้องว่าง (AVAILABLE)</option>
+              <option value="RESERVED" ${rm.status === 'RESERVED' ? 'selected' : ''}>จองแล้ว (RESERVED)</option>
+              <option value="MAINTENANCE" ${rm.status === 'MAINTENANCE' ? 'selected' : ''}>ซ่อมบำรุง</option>
+            </select>
+          </td>
+          <td class="py-2 px-2.5">
+            <input type="text" id="gl-name-${rm.roomNumber}" value="${rm.tenantName || ''}" placeholder="ชื่อผู้เช่า..." class="w-36 border border-slate-300 rounded px-2 py-1" />
+          </td>
+          <td class="py-2 px-2.5">
+            <input type="text" id="gl-phone-${rm.roomNumber}" value="${rm.phone || ''}" placeholder="08x-xxx-xxxx" class="w-28 border border-slate-300 rounded px-2 py-1 mono-num" />
+          </td>
+          <td class="py-2 px-2.5">
+            <select id="gl-tier-${rm.roomNumber}" onchange="handleGoLiveTierChange('${rm.roomNumber}', this.value)" class="border border-slate-300 rounded px-2 py-1">
+              <option value="STANDARD" ${rm.tier === 'STANDARD' ? 'selected' : ''}>Standard (2,500)</option>
+              <option value="SILVER" ${rm.tier === 'SILVER' ? 'selected' : ''}>Silver (3,000)</option>
+              <option value="GOLD" ${rm.tier === 'GOLD' ? 'selected' : ''}>Gold (3,500)</option>
+              <option value="CUSTOM" ${rm.tier === 'CUSTOM' ? 'selected' : ''}>Custom</option>
+            </select>
+          </td>
+          <td class="py-2 px-2.5 text-right">
+            <input type="number" id="gl-rent-${rm.roomNumber}" value="${fromSatang(rm.rentSatang)}" class="w-20 border border-slate-300 rounded px-2 py-1 text-right font-bold mono-num" />
+          </td>
+          <td class="py-2 px-2.5 text-right">
+            <input type="number" id="gl-water-${rm.roomNumber}" value="${rm.currWater}" class="w-20 border border-sky-300 bg-sky-50/40 rounded px-2 py-1 text-right font-bold mono-num" />
+          </td>
+          <td class="py-2 px-2.5 text-right">
+            <input type="number" id="gl-elec-${rm.roomNumber}" value="${rm.currElec}" class="w-20 border border-amber-300 bg-amber-50/40 rounded px-2 py-1 text-right font-bold mono-num" />
+          </td>
+          <td class="py-2 px-2.5 text-right">
+            <input type="number" id="gl-arrears-${rm.roomNumber}" value="${fromSatang(rm.arrearsSatang || 0)}" class="w-20 border border-slate-300 rounded px-2 py-1 text-right mono-num" />
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function handleGoLiveTierChange(roomNumber, tier) {
+      const rentEl = document.getElementById('gl-rent-' + roomNumber);
+      if (!rentEl) return;
+      const s = state.settings;
+      if (tier === 'STANDARD') rentEl.value = fromSatang(s.tierStandardSatang);
+      else if (tier === 'SILVER') rentEl.value = fromSatang(s.tierSilverSatang);
+      else if (tier === 'GOLD') rentEl.value = fromSatang(s.tierGoldSatang);
+    }
+
+    function clearAllRoomsToEmptyInModal() {
+      state.rooms.forEach(rm => {
+        const stEl = document.getElementById('gl-status-' + rm.roomNumber);
+        const nmEl = document.getElementById('gl-name-' + rm.roomNumber);
+        const phEl = document.getElementById('gl-phone-' + rm.roomNumber);
+        const arEl = document.getElementById('gl-arrears-' + rm.roomNumber);
+        if (stEl) stEl.value = 'AVAILABLE';
+        if (nmEl) nmEl.value = '';
+        if (phEl) phEl.value = '';
+        if (arEl) arEl.value = '0';
+      });
+      showToast('ล้างชื่อผู้เช่าจำลองในตารางแล้ว กรอกเฉพาะห้องที่มีผู้เช่าจริงได้เลย');
+    }
+
+    function saveGoLiveSetupGrid() {
+      state.invoices = [];
+      state.rooms.forEach(rm => {
+        const status = document.getElementById('gl-status-' + rm.roomNumber).value;
+        const name = document.getElementById('gl-name-' + rm.roomNumber).value.trim();
+        const phone = document.getElementById('gl-phone-' + rm.roomNumber).value.trim();
+        const tier = document.getElementById('gl-tier-' + rm.roomNumber).value;
+        const rentSatang = toSatang(document.getElementById('gl-rent-' + rm.roomNumber).value);
+        const water = parseInt(document.getElementById('gl-water-' + rm.roomNumber).value, 10) || 0;
+        const elec = parseInt(document.getElementById('gl-elec-' + rm.roomNumber).value, 10) || 0;
+        const arrearsSatang = toSatang(document.getElementById('gl-arrears-' + rm.roomNumber).value);
+
+        rm.status = status;
+        rm.tenantName = status === 'AVAILABLE' ? '' : (name || 'ผู้เช่าห้อง ' + rm.roomNumber);
+        rm.phone = status === 'AVAILABLE' ? '' : phone;
+        rm.tier = tier;
+        rm.rentSatang = rentSatang;
+        rm.depositSatang = status === 'OCCUPIED' ? rentSatang * state.settings.defaultDepositMonths : 0;
+        rm.prevWater = water;
+        rm.currWater = water;
+        rm.prevElec = elec;
+        rm.currElec = elec;
+        rm.arrearsSatang = arrearsSatang;
+      });
+
+      saveState();
+      closeModal('modal-golive');
+      renderAll();
+      showToast('บันทึกข้อมูลตั้งต้นจริงทั้ง 15 ห้องสำหรับ Go-Live เรียบร้อยแล้ว!');
+    }
+
+    function renderAll() {
+      renderHeaderAndKpis();
+      renderRoomsBoard();
+      renderBulkMeterTable();
+      renderInvoicesCenter();
+      renderPaymentsView();
+      renderSettingsAndExpenses();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderAll();
+    });
+  </script>
+</body>
+</html>

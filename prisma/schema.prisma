@@ -1,0 +1,302 @@
+// =============================================================================
+// Taky Apartment ERP (15 Rooms, 3 Floors) — Prisma Schema
+// Repository: ramajittilearn-ctrl/ERP-GeminiArgon4
+// Rule: Every monetary value is stored as an integer in Satang (1 THB = 100 Satang)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoomStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum PackageTier {
+  STANDARD // 2,500 THB (250,000 Satang)
+  SILVER   // 3,000 THB (300,000 Satang)
+  GOLD     // 3,500 THB (350,000 Satang)
+  CUSTOM   // Custom negotiated monthly rent
+}
+
+enum ReservationStatus {
+  ACTIVE_BOOKING
+  CONVERTED_TO_LEASE
+  FORFEITED
+}
+
+enum LeaseStatus {
+  ACTIVE
+  MOVED_OUT
+}
+
+enum InvoiceType {
+  MOVE_IN
+  MONTHLY
+  MOVE_OUT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  PAID
+  OVERDUE
+  ROLLED_OVER
+}
+
+enum LineItemType {
+  RENT
+  PRORATED_RENT
+  DEPOSIT
+  BOOKING_CREDIT
+  WATER
+  ELECTRICITY
+  ARREARS_FORWARD
+  LATE_FEE
+  CLEANING
+  DAMAGE
+  DISCOUNT
+  OTHER
+}
+
+enum PaymentMethod {
+  PROMPTPAY
+  BANK_TRANSFER
+  CASH
+}
+
+enum ExpenseCategory {
+  MAINTENANCE
+  CLEANING
+  COMMON_UTILITY
+  SUPPLIES
+  OTHER
+}
+
+model PropertySetting {
+  id                    String   @id @default("singleton")
+  apartmentName         String   @default("Taky Apartment")
+  electricityRateSatang Int      @default(650)    // 6.50 THB / unit (no minimum)
+  waterRateSatang       Int      @default(1000)   // 10.00 THB / unit (no minimum)
+  commonFeeSatang       Int      @default(0)      // 0 THB (disabled per business rule #3)
+  billingDay            Int      @default(25)     // Cutoff & meter reading on 25th
+  dueDayNextMonth       Int      @default(5)      // Payment due on 5th of next month
+  dailyLateFeeSatang    Int      @default(5000)   // 50.00 THB / day after the 5th
+  defaultDepositMonths  Int      @default(1)      // Multiplier of monthly rent
+  promptPayId           String   @default("0812345678")
+  tierStandardSatang    Int      @default(250000) // 2,500.00 THB
+  tierSilverSatang      Int      @default(300000) // 3,000.00 THB
+  tierGoldSatang        Int      @default(350000) // 3,500.00 THB
+  updatedAt             DateTime @updatedAt
+}
+
+model Room {
+  id                String         @id @default(cuid())
+  roomNumber        String         @unique // "101".."105", "201".."205", "301".."305"
+  floorNumber       Int            // 1, 2, 3
+  sizeSqm           Int            @default(21)
+  status            RoomStatus     @default(AVAILABLE)
+  lastWaterMeter    Int            @default(0)
+  lastElectricMeter Int            @default(0)
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  reservations      Reservation[]
+  leases            Lease[]
+  meterReadings     MeterReading[]
+  invoices          Invoice[]
+  expenses          Expense[]
+
+  @@index([floorNumber, roomNumber])
+}
+
+model Tenant {
+  id               String   @id @default(cuid())
+  fullName         String
+  nickname         String?
+  phone            String
+  lineId           String?
+  nationalId       String?
+  idCardImageUrl   String?
+  emergencyContact String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  leases           Lease[]
+}
+
+model Reservation {
+  id                   String            @id @default(cuid())
+  roomId               String
+  tenantName           String
+  phone                String
+  lineId               String?
+  selectedTier         PackageTier       @default(GOLD)
+  agreedRentSatang     Int
+  bookingDepositSatang Int
+  expectedMoveInDate   DateTime
+  status               ReservationStatus @default(ACTIVE_BOOKING)
+  convertedLeaseId     String?           @unique
+  note                 String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  room                 Room              @relation(fields: [roomId], references: [id])
+
+  @@index([roomId, status])
+}
+
+model Lease {
+  id                    String             @id @default(cuid())
+  roomId                String
+  tenantId              String
+  packageTier           PackageTier
+  monthlyRentSatang     Int                // Stored in Satang
+  depositMonths         Int                @default(1)
+  securityDepositSatang Int                // monthlyRentSatang * depositMonths
+  bookingCreditSatang   Int                @default(0)
+  startDate             DateTime
+  endDate               DateTime?
+  isProratedFirstMonth  Boolean            @default(true)
+  initialWaterMeter     Int
+  initialElectricMeter  Int
+  status                LeaseStatus        @default(ACTIVE)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  room                  Room               @relation(fields: [roomId], references: [id])
+  tenant                Tenant             @relation(fields: [tenantId], references: [id])
+  meterReadings         MeterReading[]
+  invoices              Invoice[]
+  depositSettlement     DepositSettlement?
+
+  @@index([roomId, status])
+}
+
+model MeterReading {
+  id               String   @id @default(cuid())
+  roomId           String
+  leaseId          String
+  billingPeriod    String   // Format: "YYYY-MM" (e.g., "2026-10")
+  readingDate      DateTime
+  prevWater        Int
+  currWater        Int
+  waterRollover    Boolean  @default(false)
+  waterUnits       Int
+  prevElectric     Int
+  currElectric     Int
+  electricRollover Boolean  @default(false)
+  electricUnits    Int
+  createdAt        DateTime @default(now())
+
+  room             Room     @relation(fields: [roomId], references: [id])
+  lease            Lease    @relation(fields: [leaseId], references: [id])
+
+  @@unique([roomId, billingPeriod])
+}
+
+model Invoice {
+  id                   String            @id @default(cuid())
+  invoiceNumber        String            @unique // e.g., "INV-202610-101"
+  leaseId              String
+  roomId               String
+  billingPeriod        String            // "YYYY-MM"
+  invoiceType          InvoiceType       @default(MONTHLY)
+  issueDate            DateTime
+  dueDate              DateTime
+  baseRentSatang       Int
+  waterSatang          Int               @default(0)
+  electricSatang       Int               @default(0)
+  arrearsForwardSatang Int               @default(0)
+  lateFeeSatang        Int               @default(0)
+  discountSatang       Int               @default(0)
+  totalAmountSatang    Int
+  paidAmountSatang     Int               @default(0)
+  balanceDueSatang     Int
+  status               InvoiceStatus     @default(ISSUED)
+  rolledIntoInvoiceId  String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  lease                Lease             @relation(fields: [leaseId], references: [id])
+  room                 Room              @relation(fields: [roomId], references: [id])
+  lineItems            InvoiceLineItem[]
+  payments             Payment[]
+
+  @@unique([roomId, billingPeriod, invoiceType])
+  @@index([status, dueDate])
+}
+
+model InvoiceLineItem {
+  id             String       @id @default(cuid())
+  invoiceId      String
+  itemType       LineItemType
+  label          String
+  quantity       Int          @default(1)
+  unitRateSatang Int
+  amountSatang   Int          // Signed integer in Satang (negative for discounts/booking credits)
+
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  invoiceId     String
+  paidAt        DateTime      @default(now())
+  amountSatang  Int
+  method        PaymentMethod @default(PROMPTPAY)
+  slipImageUrl  String?
+  referenceNote String?
+  createdAt     DateTime      @default(now())
+
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+}
+
+model DepositSettlement {
+  id                   String   @id @default(cuid())
+  leaseId              String   @unique
+  moveOutDate          DateTime
+  depositHeldSatang    Int
+  unpaidArrearsSatang  Int      @default(0)
+  finalWaterUnits      Int      @default(0)
+  finalWaterSatang     Int      @default(0)
+  finalElectricUnits   Int      @default(0)
+  finalElectricSatang  Int      @default(0)
+  cleaningFeeSatang    Int      @default(0)
+  damageFeeSatang      Int      @default(0)
+  otherDeductionSatang Int      @default(0)
+  netRefundSatang      Int      // Positive = refund to tenant; Negative = tenant owes extra
+  note                 String?
+  createdAt            DateTime @default(now())
+
+  lease                Lease    @relation(fields: [leaseId], references: [id])
+}
+
+model Expense {
+  id              String          @id @default(cuid())
+  expenseDate     DateTime
+  category        ExpenseCategory
+  roomId          String?
+  title           String
+  amountSatang    Int
+  receiptImageUrl String?
+  note            String?
+  createdAt       DateTime        @default(now())
+
+  room            Room?           @relation(fields: [roomId], references: [id])
+
+  @@index([expenseDate])
+}
