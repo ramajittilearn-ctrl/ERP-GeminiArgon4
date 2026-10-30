@@ -56,3 +56,18 @@ If either backend reset fails, **do not restart** until investigating whether on
 
 ## Operational follow-up
 The application has a dual-store inconsistency (Prisma writes vs JSON reads), and the example Docker setup does not show persistent JSON storage. Resolve these independently before registering actual tenants or accepting payments in production.
+
+## GitHub Pages: static index.html day-one migration (deployed separately from Next.js)
+
+The repository has a GitHub Pages site that serves the top-level `index.html`. Its data is **not** stored in the Prisma/PostgreSQL backend: it lives in the **current browser's localStorage** key `TAKY_ERP_PROTOTYPE_STATE_V1`. Consequently, the offline server reset described above does not reset browsers.
+
+This branch updates both `index.html` and `prototype/index.html`:
+- Every NEW browser begins with exactly 15 available rooms, zero meter readings and zero income, invoices, deposits, expenses and settlement records.
+- On the first load after the new version deploys, an EXISTING browser copies its old localStorage JSON into `TAKY_ERP_BEFORE_DAY_ONE_20261031`, preserves configured room tiers, rent rates and property settings, then resets its operating state to zero.
+- A version marker `TAKY_ERP_DAY_ONE_RESET_20261031` prevents repeat resets; new tenants added after the migration remain on reload.
+- The Settings section has a **ข้อมูลก่อนรีเซ็ต** control to download the pre-migration JSON if present. A manual reset requires confirmation and writes a separate timestamped backup key.
+- Data is **not shared between devices or browsers**; each browser carries its own copy. Browsers that never open the updated URL will not migrate. Data clearing or private browsing can erase browser records.
+
+The static GitHub Pages client is **not a full-stack production database**. Do not use it for durable multi-device tenant/accounting operations without a secured backend, centralized storage, controlled backups and authentication.
+
+For the GitHub Pages interface, publishing the updated `index.html` is sufficient to initialize fresh client data; no direct production database operation is possible from GitHub.
