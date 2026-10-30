@@ -1,0 +1,17 @@
+name: GitHub Pages day-one baseline
+on:
+  pull_request:
+  push:
+    branches: [fix/pages-day-one-zero]
+jobs:
+  test-static-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify clean dashboard and one-time migration
+        run: node tests/day-one-pages-check.mjs

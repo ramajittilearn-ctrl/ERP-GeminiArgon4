@@ -378,11 +378,12 @@
               💾 บันทึกการตั้งค่าและคำนวณใหม่
             </button>
             <div class="flex items-center gap-2">
+              <button type="button" onclick="downloadPreDayOneBackup()" title="ดาวน์โหลดสำเนาก่อนล้างข้อมูล (ถ้ามี)" class="px-3 py-2 rounded-lg bg-slate-50 text-slate-700 border border-slate-300 font-medium hover:bg-slate-100">ข้อมูลก่อนรีเซ็ต</button>
               <button type="button" onclick="exportDatabaseBackup()" class="px-3 py-2 rounded-lg bg-slate-800 text-white font-medium hover:bg-slate-700">
                 ⬇️ Backup (.json)
               </button>
               <button type="button" onclick="resetDemoDatabase()" class="px-3 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-medium hover:bg-rose-100">
-                🔄 รีเซ็ตข้อมูลตั้งต้น
+                🧹 เริ่มต้นหอพัก (ล้างข้อมูล)
               </button>
             </div>
           </div>
@@ -783,7 +784,8 @@
       `;
     }
 
-    // Default Seed State (15 Rooms across 3 Floors matching Taky Apartment)
+    // Empty operational baseline: never ship fictional tenants, invoices, deposits or expenses.
+    // Keep configured room tiers and rent tariffs, but no realized revenue.
     function createInitialState() {
       const settings = {
         apartmentName: 'Taky Apartment',
@@ -794,150 +796,138 @@
         dueDayNextMonth: 5,
         dailyLateFeeSatang: 5000,   // 50 THB/day after the 5th
         defaultDepositMonths: 1,
-        promptPayId: '081-234-5678',
+        promptPayId: '092-825-5788',
+        bankName: 'ธนาคารกสิกรไทย (KBank)',
+        bankAccount: '696-2-08678-9',
+        bankOwner: 'นายรามจิตติ ปสุตนาวิน',
+        contactInfo: 'โทร. 092-825-5788 • LINE: @takyapartment',
         tierStandardSatang: 250000, // 2,500 THB
         tierSilverSatang: 300000,   // 3,000 THB
         tierGoldSatang: 350000      // 3,500 THB
       };
-
-      const rooms = [
-        // Floor 1
-        { roomNumber: '101', floor: 1, status: 'OCCUPIED', tier: 'STANDARD', rentSatang: 250000, depositSatang: 250000, tenantName: 'คุณสมศักดิ์ มีสุข', phone: '081-412-8891', startDate: '2026-03-01', prevWater: 120, currWater: 128, waterRoll: false, prevElec: 1450, currElec: 1565, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '102', floor: 1, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณวิภาดา สายชล', phone: '089-221-3344', startDate: '2026-04-01', prevWater: 85, currWater: 92, waterRoll: false, prevElec: 980, currElec: 1110, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '103', floor: 1, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 700000, tenantName: 'คุณณัฐพล คนขยัน', phone: '086-778-9012', startDate: '2026-02-01', prevWater: 210, currWater: 219, waterRoll: false, prevElec: 2310, currElec: 2465, elecRoll: false, arrearsSatang: 120000 }, // มียอดค้างยกมา 1,200 บ.
-        { roomNumber: '104', floor: 1, status: 'RESERVED', tier: 'SILVER', rentSatang: 300000, depositSatang: 0, tenantName: 'คุณกานดา (จองแล้ว)', phone: '082-991-1122', startDate: '2026-11-01', bookingDepositSatang: 100000, prevWater: 64, currWater: 64, waterRoll: false, prevElec: 620, currElec: 620, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '105', floor: 1, status: 'AVAILABLE', tier: 'STANDARD', rentSatang: 250000, depositSatang: 0, tenantName: '', phone: '', startDate: '', prevWater: 40, currWater: 40, waterRoll: false, prevElec: 510, currElec: 510, elecRoll: false, arrearsSatang: 0 },
-
-        // Floor 2
-        { roomNumber: '201', floor: 2, status: 'OCCUPIED', tier: 'STANDARD', rentSatang: 250000, depositSatang: 250000, tenantName: 'คุณปิยะพงษ์ วงศ์คำ', phone: '084-556-7788', startDate: '2026-05-01', prevWater: 150, currWater: 156, waterRoll: false, prevElec: 1890, currElec: 1985, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '202', floor: 2, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณมณีรัตน์ ทองดี', phone: '081-990-4512', startDate: '2026-01-01', prevWater: 310, currWater: 318, waterRoll: false, prevElec: 9985, currElec: 65, elecRoll: true, arrearsSatang: 0 }, // ตัวอย่างมิเตอร์ไฟวนรอบ 9985 -> 0065
-        { roomNumber: '203', floor: 2, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 350000, tenantName: 'คุณอนุชา ศรีสวัสดิ์', phone: '083-114-5678', startDate: '2026-06-01', prevWater: 95, currWater: 103, waterRoll: false, prevElec: 1200, currElec: 1345, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '204', floor: 2, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณชลธิชา นาคิน', phone: '089-654-3210', startDate: '2026-07-01', prevWater: 72, currWater: 79, waterRoll: false, prevElec: 840, currElec: 950, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '205', floor: 2, status: 'MAINTENANCE', tier: 'STANDARD', rentSatang: 250000, depositSatang: 0, tenantName: 'ซ่อมแอร์ / ทาสีใหม่', phone: '-', startDate: '', prevWater: 110, currWater: 110, waterRoll: false, prevElec: 1320, currElec: 1320, elecRoll: false, arrearsSatang: 0 },
-
-        // Floor 3
-        { roomNumber: '301', floor: 3, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 700000, tenantName: 'คุณธนกฤต พัฒนา', phone: '081-777-2345', startDate: '2026-03-01', prevWater: 180, currWater: 188, waterRoll: false, prevElec: 2100, currElec: 2240, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '302', floor: 3, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 350000, tenantName: 'คุณอารยา ใจงาม', phone: '085-332-1987', startDate: '2026-05-01', prevWater: 140, currWater: 146, waterRoll: false, prevElec: 1650, currElec: 1790, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '303', floor: 3, status: 'OCCUPIED', tier: 'SILVER', rentSatang: 300000, depositSatang: 300000, tenantName: 'คุณวรพจน์ สุขสันต์', phone: '087-889-0011', startDate: '2026-08-01', prevWater: 54, currWater: 60, waterRoll: false, prevElec: 590, currElec: 695, elecRoll: false, arrearsSatang: 85000 }, // มียอดค้างยกมา 850 บ.
-        { roomNumber: '304', floor: 3, status: 'OCCUPIED', tier: 'STANDARD', rentSatang: 250000, depositSatang: 250000, tenantName: 'คุณสุดาพร อินทร์จันทร์', phone: '082-445-6677', startDate: '2026-09-01', prevWater: 33, currWater: 39, waterRoll: false, prevElec: 410, currElec: 500, elecRoll: false, arrearsSatang: 0 },
-        { roomNumber: '305', floor: 3, status: 'OCCUPIED', tier: 'GOLD', rentSatang: 350000, depositSatang: 350000, tenantName: 'คุณกิตติพงศ์ ยิ่งเจริญ', phone: '080-123-9876', startDate: '2026-04-01', prevWater: 165, currWater: 174, waterRoll: false, prevElec: 1920, currElec: 2050, elecRoll: false, arrearsSatang: 0 }
-      ];
-
-      // Generate initial invoices for the 12 occupied rooms as of 25 Oct 2026
-      const invoices = [];
-      rooms.forEach((rm, idx) => {
-        if (rm.status !== 'OCCUPIED') return;
-        const wUnits = calcMeterUnits(rm.prevWater, rm.currWater, rm.waterRoll);
-        const eUnits = calcMeterUnits(rm.prevElec, rm.currElec, rm.elecRoll);
-        const wSatang = wUnits * settings.waterRateSatang;
-        const eSatang = eUnits * settings.electricityRateSatang;
-        const totalSatang = rm.rentSatang + wSatang + eSatang + (rm.arrearsSatang || 0);
-
-        // Pre-populate realistic payment states: some paid, some partial, some unpaid
-        let paidSatang = 0;
-        let status = 'ISSUED';
-        const payments = [];
-        if (idx === 0 || idx === 1 || idx === 5) {
-          paidSatang = totalSatang;
-          status = 'PAID';
-          payments.push({
-            paidAt: '2026-10-26 10:15',
-            amountSatang: totalSatang,
-            method: 'PromptPay QR',
-            slipNote: 'สลิป PromptPay QR (ชำระเต็มจำนวน)'
-          });
-        } else if (rm.roomNumber === '203') {
-          paidSatang = 200000; // จ่ายบางส่วน 2,000 บาท
-          status = 'PARTIAL';
-          payments.push({
-            paidAt: '2026-10-26 18:40',
-            amountSatang: 200000,
-            method: 'โอนผ่านธนาคาร',
-            slipNote: 'สลิป KBank แบ่งจ่ายงวดแรก 2,000 บ.'
+      const roomTiers = {
+              "101": "STANDARD",
+              "102": "SILVER",
+              "103": "GOLD",
+              "104": "SILVER",
+              "105": "STANDARD",
+              "201": "STANDARD",
+              "202": "SILVER",
+              "203": "GOLD",
+              "204": "SILVER",
+              "205": "STANDARD",
+              "301": "GOLD",
+              "302": "GOLD",
+              "303": "SILVER",
+              "304": "STANDARD",
+              "305": "GOLD"
+      };
+      const rooms = [];
+      for (let floor = 1; floor <= 3; floor++) {
+        for (let index = 1; index <= 5; index++) {
+          const roomNumber = String(floor) + '0' + index;
+          const tier = roomTiers[roomNumber] || 'STANDARD';
+          const rentSatang = tier === 'GOLD'
+            ? settings.tierGoldSatang
+            : tier === 'SILVER' ? settings.tierSilverSatang : settings.tierStandardSatang;
+          rooms.push({
+            roomNumber, floor, status: 'AVAILABLE', tier, rentSatang,
+            depositSatang: 0, bookingDepositSatang: 0,
+            tenantName: '', phone: '', startDate: '',
+            prevWater: 0, currWater: 0, waterRoll: false,
+            prevElec: 0, currElec: 0, elecRoll: false,
+            arrearsSatang: 0
           });
         }
-
-        invoices.push({
-          id: 'INV-202610-' + rm.roomNumber,
-          roomNumber: rm.roomNumber,
-          tenantName: rm.tenantName,
-          tier: rm.tier,
-          billingPeriod: '2026-10',
-          issueDate: '2026-10-25',
-          dueDate: '2026-11-05',
-          rentSatang: rm.rentSatang,
-          prevWater: rm.prevWater,
-          currWater: rm.currWater,
-          waterRoll: rm.waterRoll,
-          waterUnits: wUnits,
-          waterSatang: wSatang,
-          prevElec: rm.prevElec,
-          currElec: rm.currElec,
-          elecRoll: rm.elecRoll,
-          elecUnits: eUnits,
-          elecSatang: eSatang,
-          arrearsSatang: rm.arrearsSatang || 0,
-          totalSatang: totalSatang,
-          paidSatang: paidSatang,
-          balanceDueSatang: totalSatang - paidSatang,
-          status: status,
-          payments: payments
-        });
-      });
-
-      const expenses = [
-        { id: 'EXP-1', date: '2026-10-12', category: 'ค่าไฟ/น้ำส่วนกลางตึก', title: 'ค่าไฟโถงทางเดินและปั๊มน้ำส่วนกลาง ต.ค.', amountSatang: 145000 },
-        { id: 'EXP-2', date: '2026-10-18', category: 'ซ่อมบำรุง', title: 'ล้างแอร์และเช็กน้ำยาแอร์ห้อง 205', amountSatang: 60000 },
-        { id: 'EXP-3', date: '2026-10-24', category: 'ทำความสะอาด', title: 'ค่าแม่บ้านทำความสะอาดส่วนกลาง 3 ชั้น', amountSatang: 150000 }
-      ];
-
-      const settlements = [
-        {
-          id: 'SET-202609-105',
-          roomNumber: '105',
-          tenantName: 'คุณพีรพล (ย้ายออกเมื่อ 25 ก.ย.)',
-          moveOutDate: '2026-09-25',
-          depositHeldSatang: 250000,
-          finalWaterSatang: 7000,
-          finalElecSatang: 58500,
-          cleaningFeeSatang: 30000,
-          damageFeeSatang: 0,
-          arrearsSatang: 0,
-          netRefundSatang: 154500
-        }
-      ];
-
+      }
       return {
-        simulatedDate: '2026-10-25',
+        simulatedDate: new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10),
         activeTab: 'rooms',
         roomFilter: 'ALL',
         roomSearch: '',
         invoiceSubmode: 'LINE',
-        selectedInvoiceId: 'INV-202610-103',
+        selectedInvoiceId: '',
         paymentFilter: 'UNPAID',
-        settings: settings,
-        rooms: rooms,
-        invoices: invoices,
-        expenses: expenses,
-        settlements: settlements
+        settings,
+        rooms,
+        invoices: [],
+        expenses: [],
+        settlements: []
       };
     }
+
+    // Preserve business configuration, never operational history.
+    function createDayOneState(previous) {
+      const clean = createInitialState();
+      if (previous && previous.settings && typeof previous.settings === 'object') {
+        clean.settings = { ...clean.settings, ...previous.settings };
+      }
+      if (previous && Array.isArray(previous.rooms)) {
+        const oldByNumber = new Map(previous.rooms.map(room => [room.roomNumber, room]));
+        clean.rooms = clean.rooms.map(room => {
+          const old = oldByNumber.get(room.roomNumber);
+          if (!old) return room;
+          const tier = ['STANDARD', 'SILVER', 'GOLD', 'CUSTOM'].includes(old.tier) ? old.tier : room.tier;
+          const rentSatang = Number.isSafeInteger(old.rentSatang) && old.rentSatang >= 0
+            ? old.rentSatang : room.rentSatang;
+          return { ...room, tier, rentSatang };
+        });
+      }
+      return clean;
+    }
+
+    // One-time migration: existing browsers retain pre-reset data in a separate backup key.
+    // The version flag prevents any future reload from erasing newly entered real transactions.
+    const DAY_ONE_RESET_FLAG = 'TAKY_ERP_DAY_ONE_RESET_20261031';
+    const DAY_ONE_BACKUP_KEY = 'TAKY_ERP_BEFORE_DAY_ONE_20261031';
 
     let state = loadState();
 
     function loadState() {
+      let previous = null;
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.rooms) && parsed.rooms.length === 15) {
-            return parsed;
+            previous = parsed;
           }
         }
-      } catch (e) {
-        // Fallback to in-memory state if localStorage is restricted
+        if (localStorage.getItem(DAY_ONE_RESET_FLAG) === 'complete' && previous) {
+          return previous;
+        }
+        const clean = createDayOneState(previous);
+        if (raw) {
+          // Refuse to overwrite existing state if a recovery copy cannot be written.
+          localStorage.setItem(DAY_ONE_BACKUP_KEY, raw);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+        localStorage.setItem(DAY_ONE_RESET_FLAG, 'complete');
+        return clean;
+      } catch (err) {
+        console.error('Day-one migration/storage unavailable; original data was not intentionally removed.', err);
+        // Fail closed for saved records: do not overwrite when backup/storage is unavailable.
+        return previous || createInitialState();
       }
-      return createInitialState();
+    }
+
+    function downloadPreDayOneBackup() {
+      let raw = null;
+      try { raw = localStorage.getItem(DAY_ONE_BACKUP_KEY); } catch (err) {}
+      if (!raw) {
+        showToast('ไม่พบข้อมูลสำรองก่อนเริ่มต้นในเบราว์เซอร์นี้');
+        return;
+      }
+      const blob = new Blob([raw], { type: 'application/json' });
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = 'taky_erp_before_day_one_20261031.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('ดาวน์โหลดข้อมูลสำรองก่อนเริ่มเปิดหอพักแล้ว');
     }
 
     function saveState() {
@@ -1882,10 +1872,20 @@
     }
 
     function resetDemoDatabase() {
-      state = createInitialState();
+      if (!window.confirm('ล้างข้อมูลผู้เช่า สัญญา ใบแจ้งหนี้ รายรับ และรายจ่ายทั้งหมด? ห้องทั้ง 15 ห้องจะว่างและมิเตอร์เป็น 0 (เก็บอัตราค่าเช่าและการตั้งค่าเดิม)')) return;
+      try {
+        localStorage.setItem(
+          'TAKY_ERP_MANUAL_RESET_BACKUP_' + Date.now(),
+          JSON.stringify(state)
+        );
+      } catch (err) {
+        window.alert('สำรองข้อมูลในเบราว์เซอร์ไม่สำเร็จ จึงยกเลิกการรีเซ็ต');
+        return;
+      }
+      state = createDayOneState(state);
       saveState();
       renderAll();
-      showToast('รีเซ็ตข้อมูลตัวอย่าง 15 ห้องกลับเป็นค่าเริ่มต้นแล้ว');
+      showToast('เริ่มต้นหอพักใหม่: ห้องว่าง 15 รายรับและรายจ่าย 0 บาท');
     }
 
     // =========================================================================
