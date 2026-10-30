@@ -236,7 +236,12 @@ const globalForErp = globalThis as unknown as {
 export function getErpContext(): ErpRuntimeContext {
   if (!globalForErp.takyErpContext) {
     const fromDisk = loadContextFromDisk();
-    globalForErp.takyErpContext = fromDisk || createInitialTakyErpContext();
+    // Real operations must never silently repopulate fictional tenants or expenses.
+    // Demo fixtures require an explicit opt-in and are disabled in production.
+    const allowDemo = process.env.NODE_ENV !== 'production' && process.env.ERP_LOAD_DEMO === 'true';
+    globalForErp.takyErpContext = fromDisk || (allowDemo
+      ? createInitialTakyErpContext()
+      : createCleanGoLiveErpContext(process.env.PROMPTPAY_ID || '0928255788'));
   }
   return globalForErp.takyErpContext;
 }

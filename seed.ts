@@ -25,23 +25,23 @@ export const INITIAL_PROPERTY_SETTINGS = {
 
 export const INITIAL_15_ROOMS = [
   // Floor 1
-  { roomNumber: '101', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 120, lastElectricMeter: 1450 },
-  { roomNumber: '102', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 85,  lastElectricMeter: 980 },
-  { roomNumber: '103', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 210, lastElectricMeter: 2310 },
-  { roomNumber: '104', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 64,  lastElectricMeter: 620 },
-  { roomNumber: '105', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 40,  lastElectricMeter: 510 },
+  { roomNumber: '101', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
+  { roomNumber: '102', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
+  { roomNumber: '103', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
+  { roomNumber: '104', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
+  { roomNumber: '105', floorNumber: 1, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
   // Floor 2
-  { roomNumber: '201', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 150, lastElectricMeter: 1890 },
-  { roomNumber: '202', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 310, lastElectricMeter: 9985 },
-  { roomNumber: '203', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 95,  lastElectricMeter: 1200 },
-  { roomNumber: '204', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 72,  lastElectricMeter: 840 },
-  { roomNumber: '205', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 110, lastElectricMeter: 1320 },
+  { roomNumber: '201', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
+  { roomNumber: '202', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
+  { roomNumber: '203', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
+  { roomNumber: '204', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
+  { roomNumber: '205', floorNumber: 2, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
   // Floor 3
-  { roomNumber: '301', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 180, lastElectricMeter: 2100 },
-  { roomNumber: '302', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 140, lastElectricMeter: 1650 },
-  { roomNumber: '303', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 54,  lastElectricMeter: 590 },
-  { roomNumber: '304', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 33,  lastElectricMeter: 410 },
-  { roomNumber: '305', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 165, lastElectricMeter: 1920 }
+  { roomNumber: '301', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
+  { roomNumber: '302', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 },
+  { roomNumber: '303', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
+  { roomNumber: '304', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0,  lastElectricMeter: 0 },
+  { roomNumber: '305', floorNumber: 3, sizeSqm: 21, status: 'AVAILABLE' as RoomStatus, lastWaterMeter: 0, lastElectricMeter: 0 }
 ];
 
 async function main() {
