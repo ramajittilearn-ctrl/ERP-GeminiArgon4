@@ -146,10 +146,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, data });
       }
       case 'CLEAR_FOR_GOLIVE': {
+        // Never allow a destructive reset through a live HTTP endpoint.
+        // Use the backup-first, offline operations/reset-day-one.sh procedure.
+        if (process.env.NODE_ENV === 'production') {
+          return NextResponse.json({ ok: false, error: 'Production reset requires the offline backup-first procedure.' }, { status: 403 });
+        }
         clearDemoForRealGoLive(payload?.promptPayId);
         return NextResponse.json({ ok: true });
       }
       case 'RESET_DEMO': {
+        if (process.env.NODE_ENV === 'production') {
+          return NextResponse.json({ ok: false, error: 'Demo reset is disabled in production.' }, { status: 403 });
+        }
         resetErpContext();
         return NextResponse.json({ ok: true });
       }
