@@ -1,0 +1,23 @@
+name: Day-one baseline checks
+on:
+  pull_request:
+  push:
+    branches:
+      - fix/clean-day-one-golive
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify static GitHub Pages state + syntax
+        run: node tests/day-one-pages-check.mjs
+      - name: Install and run unit tests
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma generate
+          npm run test:unit
